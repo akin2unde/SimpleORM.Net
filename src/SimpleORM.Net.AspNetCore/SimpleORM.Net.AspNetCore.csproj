@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>true</IsPackable><PackageId>SimpleORM.Net.AspNetCore</PackageId><Version>0.1.0</Version><Description>ASP.NET Core integration for SimpleORM.Net.</Description></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../SimpleORM.Net/SimpleORM.Net.csproj"/><FrameworkReference Include="Microsoft.AspNetCore.App"/></ItemGroup>
+</Project>

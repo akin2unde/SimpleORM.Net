@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SimpleORM.Net/SimpleORM.Net.csproj" />
+    <Project Path="src/SimpleORM.Net.SqlServer/SimpleORM.Net.SqlServer.csproj" />
+    <Project Path="src/SimpleORM.Net.MongoDB/SimpleORM.Net.MongoDB.csproj" />
+    <Project Path="src/SimpleORM.Net.AspNetCore/SimpleORM.Net.AspNetCore.csproj" />
+    <Project Path="src/SimpleORM.Net.Http/SimpleORM.Net.Http.csproj" />
+  </Folder>
+  <Folder Name="/samples/"><Project Path="samples/SimpleORM.Net.Sample.Api/SimpleORM.Net.Sample.Api.csproj" /></Folder>
+  <Folder Name="/tests/"><Project Path="tests/SimpleORM.Net.Tests/SimpleORM.Net.Tests.csproj" /></Folder>
+</Solution>

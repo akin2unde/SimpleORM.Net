@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>true</IsPackable><PackageId>SimpleORM.Net.MongoDB</PackageId><Version>0.1.0</Version><Description>MongoDB provider for SimpleORM.Net.</Description></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../SimpleORM.Net/SimpleORM.Net.csproj"/><PackageReference Include="MongoDB.Driver"/></ItemGroup>
+</Project>
