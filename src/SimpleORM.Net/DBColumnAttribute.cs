@@ -1,8 +1,6 @@
 using SimpleORM.Net.Configuration;
 
-
 namespace SimpleORM.Net.Attributes;
-
 
 /// <summary>
 /// Overrides the convention-based database metadata for a model property.
@@ -15,12 +13,9 @@ public sealed class DBColumnAttribute : Attribute
 
     private int _size;
 
-
     private bool _nullable;
 
-
     private EnumStorage _enumStorage;
-
 
     /// <summary>
     /// Gets or sets the physical database column name. When omitted, the CLR
@@ -31,7 +26,6 @@ public sealed class DBColumnAttribute : Attribute
         get;
 
         set;
-
 
     }
 
@@ -45,16 +39,13 @@ public sealed class DBColumnAttribute : Attribute
 
         get => _size;
 
-
         set
 
         {
 
             _size = value;
 
-
             HasSize = true;
-
 
         }
 
@@ -70,16 +61,13 @@ public sealed class DBColumnAttribute : Attribute
 
         get => _nullable;
 
-
         set
 
         {
 
             _nullable = value;
 
-
             HasNullable = true;
-
 
         }
 
@@ -95,16 +83,13 @@ public sealed class DBColumnAttribute : Attribute
 
         get => _enumStorage;
 
-
         set
 
         {
 
             _enumStorage = value;
 
-
             HasEnumStorage = true;
-
 
         }
 
@@ -117,7 +102,6 @@ public sealed class DBColumnAttribute : Attribute
 
         private set;
 
-
     }
 
     /// <summary>Indicates whether <see cref="Nullable"/> was explicitly supplied.</summary>
@@ -127,7 +111,6 @@ public sealed class DBColumnAttribute : Attribute
 
         private set;
 
-
     }
 
     /// <summary>Indicates whether <see cref="EnumStorage"/> was explicitly supplied.</summary>
@@ -136,7 +119,6 @@ public sealed class DBColumnAttribute : Attribute
         get;
 
         private set;
-
 
     }
 

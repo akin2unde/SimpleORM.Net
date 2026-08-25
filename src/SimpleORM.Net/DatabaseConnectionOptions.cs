@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Configuration;
 
-
 /// <summary>Provider-neutral connection configuration.</summary>
 public sealed class DatabaseConnectionOptions
 {
@@ -14,7 +13,6 @@ public sealed class DatabaseConnectionOptions
 
     }
     ="localhost";
-
 
     /// <summary>Port.</summary>
     public int Port
@@ -34,7 +32,6 @@ public sealed class DatabaseConnectionOptions
 
     }
     =string.Empty;
-
 
     /// <summary>Username.</summary>
     public string? Username
@@ -70,6 +67,5 @@ public sealed class DatabaseConnectionOptions
 
     }
     =new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
-
 
 }

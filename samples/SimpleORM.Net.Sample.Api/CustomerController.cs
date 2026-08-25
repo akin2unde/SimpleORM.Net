@@ -17,6 +17,7 @@ public sealed class CustomerController : ControllerBase
     /// <summary>
     /// Initializes a new instance of the <see cref="CustomerController"/> class.
     /// </summary>
+    /// <param name="service">The customer application service.</param>
     public CustomerController(ICustomerService service)
     {
         _service = service;
@@ -30,15 +31,15 @@ public sealed class CustomerController : ControllerBase
         [FromBody] SearchParam? search,
         [FromQuery] int skip = 0,
         [FromQuery] int limit = 100,
-        [FromQuery] int? batch = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        [FromQuery] int? batch = null)
     {
         return _service.Select(
             search,
             skip,
             limit,
-            batch,
-            cancellationToken);
+            cancellationToken,
+            batch);
     }
 
     /// <summary>
@@ -48,14 +49,14 @@ public sealed class CustomerController : ControllerBase
     public Task<PagedResult<Customer>> SelectActive(
         [FromQuery] int skip = 0,
         [FromQuery] int limit = 100,
-        [FromQuery] int? batch = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        [FromQuery] int? batch = null)
     {
         return _service.SelectActive(
             skip,
             limit,
-            batch,
-            cancellationToken);
+            cancellationToken,
+            batch);
     }
 
     /// <summary>
@@ -105,15 +106,15 @@ public sealed class CustomerController : ControllerBase
         [FromQuery] string text,
         [FromQuery] int skip = 0,
         [FromQuery] int limit = 100,
-        [FromQuery] int? batch = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        [FromQuery] int? batch = null)
     {
         return _service.Search(
             text,
             skip,
             limit,
-            batch,
-            cancellationToken);
+            cancellationToken,
+            batch);
     }
 
     /// <summary>
@@ -159,13 +160,13 @@ public sealed class CustomerController : ControllerBase
     [HttpPost("SaveBatch")]
     public Task<IReadOnlyList<Customer>> SaveBatch(
         [FromBody] IReadOnlyList<Customer> customers,
-        [FromQuery] int? batch = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        [FromQuery] int? batch = null)
     {
         return _service.SaveBatch(
             customers,
-            batch,
-            cancellationToken);
+            cancellationToken,
+            batch);
     }
 
     /// <summary>
@@ -235,6 +236,18 @@ public sealed class CustomerController : ControllerBase
             customerCode,
             extensionCode,
             value,
+            cancellationToken);
+    }
+
+    /// <summary>Demonstrates saving two model types in one SimpleORM transaction.</summary>
+    [HttpPost("SaveTransaction")]
+    public Task<IReadOnlyList<Customer>> SaveTransaction(
+        [FromBody] TransactionSaveRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return _service.SaveCustomersAndInventory(
+            request.Customers,
+            request.Inventories,
             cancellationToken);
     }
 }

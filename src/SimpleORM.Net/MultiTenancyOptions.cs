@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Configuration;
 
-
 /// <summary>Tenant conventions.</summary>
 public sealed class MultiTenancyOptions
 {
@@ -23,6 +22,5 @@ public sealed class MultiTenancyOptions
 
     }
     ="tenant";
-
 
 }

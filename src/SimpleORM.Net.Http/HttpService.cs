@@ -1,26 +1,18 @@
 using System.Collections;
 
-
 using System.Dynamic;
-
 
 using System.Globalization;
 
-
 using System.Net.Http.Headers;
-
 
 using System.Text;
 
-
 using System.Text.Json;
-
 
 using System.Xml.Serialization;
 
-
 namespace SimpleORM.Net.Http;
-
 
 /// <summary>
 /// Sends outbound HTTP requests using <see cref="IHttpClientFactory"/> and converts responses to the requested type.
@@ -30,15 +22,11 @@ public sealed class HttpService : IHttpService
 
     private const string ClientName = "SimpleORM.Net.Http";
 
-
     private readonly IHttpClientFactory _httpClientFactory;
-
 
     private readonly SimpleOrmHttpOptions _options;
 
-
     private readonly JsonSerializerOptions _jsonOptions;
-
 
     /// <summary>
     /// Initializes a new instance of the <see cref="HttpService"/> class.
@@ -51,16 +39,13 @@ public sealed class HttpService : IHttpService
 
         _httpClientFactory = httpClientFactory;
 
-
         _options = options;
-
 
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
         }
         ;
-
 
     }
 
@@ -73,13 +58,11 @@ public sealed class HttpService : IHttpService
 
         ArgumentNullException.ThrowIfNull(request);
 
-
         if (string.IsNullOrWhiteSpace(request.Url))
 
         {
 
             throw new ArgumentException("The request URL is required.", nameof(request));
-
 
         }
 
@@ -89,23 +72,18 @@ public sealed class HttpService : IHttpService
 
             using var message = BuildRequestMessage(request);
 
-
             using var timeoutSource = CreateTimeoutSource(request.Timeout, cancellationToken);
 
-
             var client = _httpClientFactory.CreateClient(ClientName);
-
 
             using var response = await client.SendAsync(
             message,
             HttpCompletionOption.ResponseHeadersRead,
             timeoutSource.Token).ConfigureAwait(false);
 
-
             var rawResponse = response.Content is null
             ? string.Empty
             : await response.Content.ReadAsStringAsync(timeoutSource.Token).ConfigureAwait(false);
-
 
             if (!response.IsSuccessStatusCode && _options.ThrowOnError)
 
@@ -114,13 +92,11 @@ public sealed class HttpService : IHttpService
                 throw new HttpRequestException(
                 $"HTTP request failed with status code {(int)response.StatusCode} ({response.ReasonPhrase}).");
 
-
             }
 
             var data = response.IsSuccessStatusCode
             ? Deserialize<T>(rawResponse, response.Content?.Headers.ContentType?.MediaType)
             : default;
-
 
             return new HttpResponse<T>
 
@@ -135,7 +111,6 @@ public sealed class HttpService : IHttpService
 
             }
             ;
-
 
         }
 
@@ -153,7 +128,6 @@ public sealed class HttpService : IHttpService
 
             }
             ;
-
 
         }
 
@@ -173,7 +147,6 @@ public sealed class HttpService : IHttpService
             }
             ;
 
-
         }
 
     }
@@ -186,7 +159,6 @@ public sealed class HttpService : IHttpService
     {
 
         var response = await Send<ExpandoObject>(request, cancellationToken).ConfigureAwait(false);
-
 
         return new HttpResponse<dynamic>
 
@@ -202,7 +174,6 @@ public sealed class HttpService : IHttpService
         }
         ;
 
-
     }
 
     private HttpRequestMessage BuildRequestMessage(HttpRequestOptions request)
@@ -211,16 +182,13 @@ public sealed class HttpService : IHttpService
 
         var message = new HttpRequestMessage(MapMethod(request.Method), BuildUri(request.Url, request.Query));
 
-
         message.Content = BuildContent(request);
-
 
         if (!string.IsNullOrWhiteSpace(request.BearerToken))
 
         {
 
             message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", request.BearerToken);
-
 
         }
 
@@ -230,7 +198,6 @@ public sealed class HttpService : IHttpService
 
             AddHeader(message, header.Key, header.Value);
 
-
         }
 
         foreach (var header in request.Headers)
@@ -239,17 +206,13 @@ public sealed class HttpService : IHttpService
 
             message.Headers.Remove(header.Key);
 
-
             message.Content?.Headers.Remove(header.Key);
 
-
             AddHeader(message, header.Key, header.Value);
-
 
         }
 
         return message;
-
 
     }
 
@@ -262,7 +225,6 @@ public sealed class HttpService : IHttpService
         {
 
             return null;
-
 
         }
 
@@ -289,7 +251,6 @@ public sealed class HttpService : IHttpService
         }
         ;
 
-
     }
 
     private static MultipartFormDataContent BuildMultipartContent(object payload)
@@ -297,7 +258,6 @@ public sealed class HttpService : IHttpService
     {
 
         var content = new MultipartFormDataContent();
-
 
         foreach (var pair in ToObjectPairs(payload))
 
@@ -309,7 +269,6 @@ public sealed class HttpService : IHttpService
 
                 content.Add(new StringContent(string.Empty), pair.Key);
 
-
             }
 
             else if (pair.Value is HttpContent httpContent)
@@ -317,7 +276,6 @@ public sealed class HttpService : IHttpService
             {
 
                 content.Add(httpContent, pair.Key);
-
 
             }
 
@@ -327,7 +285,6 @@ public sealed class HttpService : IHttpService
 
                 content.Add(new ByteArrayContent(bytes), pair.Key, pair.Key);
 
-
             }
 
             else if (pair.Value is Stream stream)
@@ -335,7 +292,6 @@ public sealed class HttpService : IHttpService
             {
 
                 content.Add(new StreamContent(stream), pair.Key, pair.Key);
-
 
             }
 
@@ -347,13 +303,11 @@ public sealed class HttpService : IHttpService
                 new StringContent(Convert.ToString(pair.Value, CultureInfo.InvariantCulture) ?? string.Empty),
                 pair.Key);
 
-
             }
 
         }
 
         return content;
-
 
     }
 
@@ -368,7 +322,6 @@ public sealed class HttpService : IHttpService
             yield return new KeyValuePair<string, string>(
             pair.Key,
             Convert.ToString(pair.Value, CultureInfo.InvariantCulture) ?? string.Empty);
-
 
         }
 
@@ -388,11 +341,9 @@ public sealed class HttpService : IHttpService
 
                 yield return pair;
 
-
             }
 
             yield break;
-
 
         }
 
@@ -410,13 +361,11 @@ public sealed class HttpService : IHttpService
 
                     yield return new KeyValuePair<string, object?>(entry.Key.ToString()!, entry.Value);
 
-
                 }
 
             }
 
             yield break;
-
 
         }
 
@@ -430,7 +379,6 @@ public sealed class HttpService : IHttpService
 
                 yield return new KeyValuePair<string, object?>(property.Name, property.GetValue(payload));
 
-
             }
 
         }
@@ -443,15 +391,11 @@ public sealed class HttpService : IHttpService
 
         var serializer = new XmlSerializer(payload.GetType());
 
-
         using var writer = new StringWriter(CultureInfo.InvariantCulture);
-
 
         serializer.Serialize(writer, payload);
 
-
         return writer.ToString();
-
 
     }
 
@@ -465,7 +409,6 @@ public sealed class HttpService : IHttpService
 
             return (T)(object)rawResponse;
 
-
         }
 
         if (string.IsNullOrWhiteSpace(rawResponse))
@@ -473,7 +416,6 @@ public sealed class HttpService : IHttpService
         {
 
             return default;
-
 
         }
 
@@ -484,17 +426,13 @@ public sealed class HttpService : IHttpService
 
             var serializer = new XmlSerializer(typeof(T));
 
-
             using var reader = new StringReader(rawResponse);
 
-
             return (T?)serializer.Deserialize(reader);
-
 
         }
 
         return JsonSerializer.Deserialize<T>(rawResponse, _jsonOptions);
-
 
     }
 
@@ -514,23 +452,19 @@ public sealed class HttpService : IHttpService
     }
     ;
 
-
     private static Uri BuildUri(string url, IDictionary<string, string?> query)
 
     {
 
         var builder = new UriBuilder(url);
 
-
         var values = new List<string>();
-
 
         if (!string.IsNullOrWhiteSpace(builder.Query))
 
         {
 
             values.Add(builder.Query.TrimStart('?'));
-
 
         }
 
@@ -539,12 +473,9 @@ public sealed class HttpService : IHttpService
         .Where(x => x.Value is not null)
         .Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value!)}"));
 
-
         builder.Query = string.Join("&", values.Where(x => !string.IsNullOrWhiteSpace(x)));
 
-
         return builder.Uri;
-
 
     }
 
@@ -558,7 +489,6 @@ public sealed class HttpService : IHttpService
 
             message.Content.Headers.TryAddWithoutValidation(name, value);
 
-
         }
 
     }
@@ -569,9 +499,7 @@ public sealed class HttpService : IHttpService
 
         var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-
         var timeout = requestedTimeout ?? _options.DefaultTimeout;
-
 
         if (timeout > TimeSpan.Zero && timeout != Timeout.InfiniteTimeSpan)
 
@@ -579,11 +507,9 @@ public sealed class HttpService : IHttpService
 
             source.CancelAfter(timeout);
 
-
         }
 
         return source;
-
 
     }
 
@@ -593,13 +519,11 @@ public sealed class HttpService : IHttpService
 
         var headers = new Dictionary<string, IEnumerable<string>>(StringComparer.OrdinalIgnoreCase);
 
-
         foreach (var header in response.Headers)
 
         {
 
             headers[header.Key] = header.Value;
-
 
         }
 
@@ -613,13 +537,11 @@ public sealed class HttpService : IHttpService
 
                 headers[header.Key] = header.Value;
 
-
             }
 
         }
 
         return headers;
-
 
     }
 

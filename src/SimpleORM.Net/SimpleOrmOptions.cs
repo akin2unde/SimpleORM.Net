@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Configuration;
 
-
 /// <summary>Root ORM options.</summary>
 public sealed class SimpleOrmOptions
 {
@@ -15,7 +14,6 @@ public sealed class SimpleOrmOptions
     }
     =DatabaseType.SqlServer;
 
-
     /// <summary>Connection options.</summary>
     public DatabaseConnectionOptions Connection
     {
@@ -23,7 +21,6 @@ public sealed class SimpleOrmOptions
 
     }
     =new();
-
 
     /// <summary>Default string size.</summary>
     public int DefaultStringLength
@@ -35,7 +32,6 @@ public sealed class SimpleOrmOptions
     }
     =50;
 
-
     /// <summary>Global enum storage.</summary>
     public EnumStorage EnumStorage
     {
@@ -45,7 +41,6 @@ public sealed class SimpleOrmOptions
 
     }
     =EnumStorage.String;
-
 
     /// <summary>Startup synchronization flag.</summary>
     public bool AutoMigration
@@ -57,7 +52,6 @@ public sealed class SimpleOrmOptions
     }
     =true;
 
-
     /// <summary>Code generation.</summary>
     public CodeGenerationOptions CodeGeneration
     {
@@ -65,7 +59,6 @@ public sealed class SimpleOrmOptions
 
     }
     =new();
-
 
     /// <summary>Batch settings.</summary>
     public BatchOptions Batch
@@ -75,7 +68,6 @@ public sealed class SimpleOrmOptions
     }
     =new();
 
-
     /// <summary>Tenant settings.</summary>
     public MultiTenancyOptions MultiTenancy
     {
@@ -83,7 +75,6 @@ public sealed class SimpleOrmOptions
 
     }
     =new();
-
 
     /// <summary>Search settings.</summary>
     public SearchOptions Search
@@ -93,7 +84,6 @@ public sealed class SimpleOrmOptions
     }
     =new();
 
-
     /// <summary>Audit settings.</summary>
     public AuditTrailOptions AuditTrail
     {
@@ -101,7 +91,6 @@ public sealed class SimpleOrmOptions
 
     }
     =new();
-
 
     /// <summary>Extension settings.</summary>
     public ExtensionOptions Extensions
@@ -111,7 +100,6 @@ public sealed class SimpleOrmOptions
     }
     =new();
 
-
     /// <summary>Error-log settings.</summary>
     public ErrorLogOptions ErrorLog
     {
@@ -120,7 +108,6 @@ public sealed class SimpleOrmOptions
     }
     =new();
 
-
     /// <summary>Migration settings.</summary>
     public MigrationOptions Migrations
     {
@@ -128,6 +115,5 @@ public sealed class SimpleOrmOptions
 
     }
     =new();
-
 
 }

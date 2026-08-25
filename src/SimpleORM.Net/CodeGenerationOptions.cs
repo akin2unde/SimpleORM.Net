@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Configuration;
 
-
 /// <summary>Code generation conventions.</summary>
 public sealed class CodeGenerationOptions
 {
@@ -15,7 +14,6 @@ public sealed class CodeGenerationOptions
     }
     =10;
 
-
     /// <summary>Inferred prefix length.</summary>
     public int PrefixLength
     {
@@ -26,7 +24,6 @@ public sealed class CodeGenerationOptions
     }
     =3;
 
-
     /// <summary>Separator.</summary>
     public string Separator
     {
@@ -36,6 +33,5 @@ public sealed class CodeGenerationOptions
 
     }
     ="-";
-
 
 }

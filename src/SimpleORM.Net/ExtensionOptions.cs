@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Configuration;
 
-
 /// <summary>Extension configuration.</summary>
 public sealed class ExtensionOptions
 {

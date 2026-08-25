@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Configuration;
 
-
 /// <summary>Audit configuration.</summary>
 public sealed class AuditTrailOptions
 {
@@ -24,7 +23,6 @@ public sealed class AuditTrailOptions
     }
     =true;
 
-
     /// <summary>New values.</summary>
     public bool IncludeNewValues
     {
@@ -34,6 +32,5 @@ public sealed class AuditTrailOptions
 
     }
     =true;
-
 
 }

@@ -1,11 +1,8 @@
 using SimpleORM.Net.Attributes;
 
-
 using SimpleORM.Net.Models;
 
-
 namespace SimpleORM.Net.SystemModels;
-
 
 /// <summary>Audit operation.</summary>
 public enum AuditAction

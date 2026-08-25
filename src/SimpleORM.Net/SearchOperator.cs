@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Query;
 
-
 /// <summary>Provider-neutral filter operators.</summary>
 public enum SearchOperator
 {

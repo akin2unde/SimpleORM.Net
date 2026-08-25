@@ -1,8 +1,6 @@
 using SimpleORM.Net.Attributes;
 
-
 namespace SimpleORM.Net.Models;
-
 
 /// <summary>Supported dynamic extension value types.</summary>
 public enum ExtensionDataType

@@ -1,11 +1,8 @@
 using SimpleORM.Net.Attributes;
 
-
 using SimpleORM.Net.Models;
 
-
 namespace SimpleORM.Net.Tests;
-
 
 internal sealed class Customer : DBModel
 {
@@ -16,10 +13,8 @@ internal sealed class Customer : DBModel
 
         set;
 
-
     }
     = string.Empty;
-
 
     [NotSearchable]
     public string Secret
@@ -28,9 +23,7 @@ internal sealed class Customer : DBModel
 
         set;
 
-
     }
     = string.Empty;
-
 
 }

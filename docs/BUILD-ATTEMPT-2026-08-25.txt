@@ -1,0 +1,5 @@
+Build validation attempt: 2026-08-25
+Command: dotnet build SimpleORM.Net.slnx -c Release --no-restore
+Result: not executed because the artifact editing environment does not have the dotnet CLI installed (dotnet: command not found).
+
+The repository was statically checked for brace balance and stale IDataService<T>/DataService<T>/AddSimpleOrmCore source references. Please run the normal GitHub build workflow or `dotnet build SimpleORM.Net.slnx -c Release` in a .NET 10 environment before publishing.

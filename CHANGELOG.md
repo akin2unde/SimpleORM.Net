@@ -2,9 +2,9 @@
 
 ## Sample API correction
 
-- Rebuilt the sample around Controller -> ICustomerService -> IDataService<Customer>.
+- Rebuilt the sample around Controller -> ICustomerService -> IDataRepository.
 - Added the missing Customer sample model.
-- Added end-to-end examples for every IDataService<Customer> method.
+- Added end-to-end examples for every IDataRepository method.
 - Added database-backed sample extension loading/saving and optional publishing workflow.
 - Added a detailed sample README.
 - Fixed Mongo provider DI lifetime mismatch with scoped tenant resolution.

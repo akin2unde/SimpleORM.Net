@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Configuration;
 
-
 /// <summary>Error-log configuration.</summary>
 public sealed class ErrorLogOptions
 {
@@ -24,7 +23,6 @@ public sealed class ErrorLogOptions
     }
     =true;
 
-
     /// <summary>Payload max chars.</summary>
     public int MaxPayloadLength
     {
@@ -34,6 +32,5 @@ public sealed class ErrorLogOptions
 
     }
     =10_000;
-
 
 }

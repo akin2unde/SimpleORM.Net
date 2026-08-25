@@ -1,20 +1,14 @@
 using System.Collections.Concurrent;
 
-
 using System.Reflection;
-
 
 using SimpleORM.Net.Attributes;
 
-
 using SimpleORM.Net.Configuration;
-
 
 using SimpleORM.Net.Models;
 
-
 namespace SimpleORM.Net.Metadata;
-
 
 /// <summary>DBModel discovery helper.</summary>
 public static class ModelDiscovery
@@ -35,6 +29,5 @@ public static class ModelDiscovery
         }
     }
     ).Where(t=>t.IsClass&&!t.IsAbstract&&typeof(DBModel).IsAssignableFrom(t)).Distinct().ToArray();
-
 
 }

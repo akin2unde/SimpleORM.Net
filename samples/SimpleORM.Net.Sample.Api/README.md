@@ -1,8 +1,8 @@
 # SimpleORM.Net Sample API
 
-This project is an end-to-end example of using **SimpleORM.Net** from an ASP.NET Core application with a normal **Controller → Application Service → IDataService<T>** structure.
+This project is an end-to-end example of using **SimpleORM.Net** from an ASP.NET Core application with a normal **Controller → Application Service → IDataRepository** structure.
 
-The controller does not know how the ORM works internally. `CustomerController` talks to `ICustomerService`; `CustomerService` uses `IDataService<Customer>` and `IDataService<DBExtensionDefinition>`.
+The controller does not know how the ORM works internally. `CustomerController` talks to `ICustomerService`; `CustomerService` uses one injected `IDataRepository` for every model type.
 
 The sample also replaces the core no-op `IExtensionService` with `SampleExtensionService` so dynamic Customer extension values are actually persisted and loaded using the currently selected database provider.
 
@@ -78,10 +78,10 @@ By convention:
 
 ## 3. Registration
 
-`Program.cs` calls `AddSimpleOrmCore`, then registers either SQL Server or MongoDB.
+`Program.cs` calls `AddSimpleOrm`, then registers either SQL Server or MongoDB.
 
 ```csharp
-builder.Services.AddSimpleOrmCore(
+builder.Services.AddSimpleOrm(
     options =>
     {
         options.Database = provider;
@@ -137,18 +137,20 @@ public sealed class CustomerController : ControllerBase
 }
 ```
 
-The application service injects the generic ORM services:
+The application service injects one generic repository and the transaction manager:
 
 ```csharp
 public CustomerService(
-    IDataService<Customer> customers,
-    IDataService<DBExtensionDefinition> extensionDefinitions,
+    IDataRepository repository,
+    IDBTransactionManager transactionManager,
     SimpleOrmOptions options)
 ```
 
+The repository is not tied to one model type. Specify the model on each call, for example `Select<Customer>()`, `Save<Inventory>()`, or `GetByCode<DBExtensionDefinition>()`.
+
 This keeps HTTP concerns out of the data layer and keeps ORM-specific calls out of controllers.
 
-## 5. IDataService methods demonstrated by CustomerService
+## 5. IDataRepository methods demonstrated by CustomerService
 
 ### Select with SearchParam
 
@@ -162,12 +164,12 @@ search.Filters.Add(
         Value = CustomerStatus.Active
     });
 
-var result = await _customers.Select(
+var result = await _repository.Select<Customer>(
     search,
     skip: 0,
     limit: 100,
-    batch: 100,
-    cancellationToken);
+    cancellationToken,
+    batch: 100);
 ```
 
 `limit: 0` means return all matching records. Internally the ORM still reads in batches and never sends a physical batch larger than 500.
@@ -175,13 +177,12 @@ var result = await _customers.Select(
 ### Select with expression
 
 ```csharp
-var result = await _customers.Select(
+var result = await _repository.Select<Customer>(
     customer => customer.Status == CustomerStatus.Active,
-    search: null,
     skip: 0,
     limit: 100,
-    batch: null,
-    cancellationToken);
+    cancellationToken,
+    batch: null);
 ```
 
 ### SelectSingle with SearchParam
@@ -196,7 +197,7 @@ search.Filters.Add(
         Value = "user@example.com"
     });
 
-var customer = await _customers.SelectSingle(
+var customer = await _repository.SelectSingle<Customer>(
     search,
     cancellationToken);
 ```
@@ -204,16 +205,15 @@ var customer = await _customers.SelectSingle(
 ### SelectSingle with expression
 
 ```csharp
-var customer = await _customers.SelectSingle(
+var customer = await _repository.SelectSingle<Customer>(
     item => item.Email == "user@example.com",
-    search: null,
     cancellationToken);
 ```
 
 ### GetByCode
 
 ```csharp
-var customer = await _customers.GetByCode(
+var customer = await _repository.GetByCode<Customer>(
     "CUS-A7K4M2X9PQ",
     cancellationToken);
 ```
@@ -221,21 +221,21 @@ var customer = await _customers.GetByCode(
 ### Generic string search
 
 ```csharp
-var result = await _customers.Search(
+var result = await _repository.Search<Customer>(
     "Akintunde",
-    searchParam: null,
+    search: null,
     skip: 0,
     limit: 100,
-    batch: null,
-    cancellationToken);
+    cancellationToken,
+    batch: null);
 ```
 
-All eligible string fields are searched automatically. `[NotSearchable]` excludes a field. `TenantCode` participates only when `Search.IncludeTenantCode` is enabled.
+All eligible string fields are searched automatically. `[NotSearchable]` excludes a field. `Tenant` participates only when `Search.IncludeTenantCode` is enabled.
 
 ### Count with SearchParam
 
 ```csharp
-var total = await _customers.Count(
+var total = await _repository.Count<Customer>(
     search,
     cancellationToken);
 ```
@@ -245,7 +245,7 @@ The result type is `long`.
 ### Count with expression
 
 ```csharp
-var total = await _customers.Count(
+var total = await _repository.Count<Customer>(
     customer => customer.Status == CustomerStatus.Active,
     search: null,
     cancellationToken);
@@ -266,7 +266,7 @@ var customer = new Customer
     DataState = DataState.New
 };
 
-await _customers.Save(customer, cancellationToken);
+await _repository.Save(customer, cancellationToken);
 ```
 
 Update:
@@ -274,14 +274,14 @@ Update:
 ```csharp
 customer.Name = "ABC Nigeria Limited";
 customer.DataState = DataState.Changed;
-await _customers.Save(customer, cancellationToken);
+await _repository.Save(customer, cancellationToken);
 ```
 
 Delete:
 
 ```csharp
 customer.DataState = DataState.Removed;
-await _customers.Save(customer, cancellationToken);
+await _repository.Save(customer, cancellationToken);
 ```
 
 Normal models are soft-deleted. `[HardDelete]` changes `Removed` to a physical delete.
@@ -289,10 +289,10 @@ Normal models are soft-deleted. `[HardDelete]` changes `Removed` to a physical d
 ### Save a batch
 
 ```csharp
-await _customers.Save(
+await _repository.Save(
     customers,
-    batch: 250,
-    cancellationToken);
+    cancellationToken,
+    batch: 250);
 ```
 
 The configured/default batch is 100. A supplied or configured batch above 500 is physically capped at 500. The logical Save still processes the complete collection.
@@ -300,7 +300,7 @@ The configured/default batch is 100. A supplied or configured batch above 500 is
 ### GenerateDebugQuery
 
 ```csharp
-var query = _customers.GenerateDebugQuery(
+var query = _repository.GenerateDebugQuery<Customer>(
     search,
     skip: 0,
     limit: 100);
@@ -424,7 +424,7 @@ The service:
 2. verifies `CREDIT_LIMIT` is defined/published;
 3. sets `customer.Extended["CREDIT_LIMIT"].Data`;
 4. changes the Customer to `DataState.Changed`;
-5. calls `IDataService<Customer>.Save`;
+5. calls `IDataRepository.Save`;
 6. `SampleExtensionService.Save` writes the extension value using the same business transaction.
 
 Required extension fields are validated before their values are written. String extensions also enforce the definition size when supplied.
@@ -521,7 +521,7 @@ Enable:
 }
 ```
 
-`AddSimpleOrmAspNetCore()` supplies JWT-backed tenant/user providers. When tenancy is enabled, the provider automatically scopes reads and writes to the current tenant. Making `TenantCode` searchable does not disable tenant isolation.
+`AddSimpleOrmAspNetCore()` supplies JWT-backed tenant/user providers. When tenancy is enabled, the provider automatically scopes reads and writes to the current tenant. Making `Tenant` searchable does not disable tenant isolation.
 
 ## 10. Suggested first run
 
@@ -538,3 +538,29 @@ Enable:
 11. Use `/customer/GenerateDebugQuery` to inspect the generated provider query.
 
 This sample intentionally keeps the HTTP layer thin and shows the ORM from an application-service layer, which is the recommended pattern for larger applications.
+
+## Repository transaction example
+
+`POST /customer/SaveTransaction` demonstrates a business operation that saves `Customer` and `Inventory` records inside one `IDBTransactionManager.Execute` call:
+
+```csharp
+return await _transactionManager.Execute(
+    async () =>
+    {
+        var savedCustomers = await _repository.Save(
+            customers,
+            cancellationToken);
+
+        if (inventories.Count > 0)
+        {
+            await _repository.Save(
+                inventories,
+                cancellationToken);
+        }
+
+        return savedCustomers;
+    },
+    cancellationToken);
+```
+
+The transaction manager owns begin/commit/rollback. Repository operations inside the callback reuse the active scoped transaction, so if the inventory save fails the customer save is rolled back as part of the same logical operation.

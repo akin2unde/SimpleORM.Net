@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Query;
 
-
 /// <summary>Join modes.</summary>
 public enum JoinType
 {

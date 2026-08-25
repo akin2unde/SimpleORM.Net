@@ -1,8 +1,6 @@
 using SimpleORM.Net.Attributes;
 
-
 namespace SimpleORM.Net.Models;
-
 
 /// <summary>Persistence state used by the single Save API.</summary>
 public enum DataState

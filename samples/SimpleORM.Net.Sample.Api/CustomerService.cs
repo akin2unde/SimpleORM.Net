@@ -1,3 +1,4 @@
+using SimpleORM.Net.Abstractions;
 using SimpleORM.Net.Configuration;
 using SimpleORM.Net.Models;
 using SimpleORM.Net.Query;
@@ -7,25 +8,32 @@ using SimpleORM.Net.SystemModels;
 namespace SimpleORM.Net.Sample.Api;
 
 /// <summary>
-/// Sample application service showing how a real application can wrap
-/// <see cref="IDataService{Customer}"/> instead of injecting the ORM directly into controllers.
+/// Application service demonstrating the repository-style SimpleORM.Net API.
 /// </summary>
+/// <remarks>
+/// The service intentionally contains examples for the major <see cref="IDataRepository"/>
+/// operations so consumers can see how to keep controllers thin while centralizing
+/// application data-access behavior in a service layer.
+/// </remarks>
 public sealed class CustomerService : ICustomerService
 {
-    private readonly IDataService<Customer> _customers;
-    private readonly IDataService<DBExtensionDefinition> _extensionDefinitions;
+    private readonly IDataRepository _repository;
+    private readonly IDBTransactionManager _transactionManager;
     private readonly SimpleOrmOptions _options;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CustomerService"/> class.
     /// </summary>
+    /// <param name="repository">The generic SimpleORM.Net data repository.</param>
+    /// <param name="transactionManager">The transaction manager used for multi-model operations.</param>
+    /// <param name="options">The configured SimpleORM.Net options.</param>
     public CustomerService(
-        IDataService<Customer> customers,
-        IDataService<DBExtensionDefinition> extensionDefinitions,
+        IDataRepository repository,
+        IDBTransactionManager transactionManager,
         SimpleOrmOptions options)
     {
-        _customers = customers;
-        _extensionDefinitions = extensionDefinitions;
+        _repository = repository;
+        _transactionManager = transactionManager;
         _options = options;
     }
 
@@ -34,31 +42,30 @@ public sealed class CustomerService : ICustomerService
         SearchParam? search = null,
         int skip = 0,
         int limit = 100,
-        int? batch = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? batch = null)
     {
-        return _customers.Select(
+        return _repository.Select<Customer>(
             search,
             skip,
             limit,
-            batch,
-            cancellationToken);
+            cancellationToken,
+            batch);
     }
 
     /// <inheritdoc />
     public Task<PagedResult<Customer>> SelectActive(
         int skip = 0,
         int limit = 100,
-        int? batch = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? batch = null)
     {
-        return _customers.Select(
+        return _repository.Select<Customer>(
             customer => customer.Status == CustomerStatus.Active,
-            search: null,
-            skip: skip,
-            limit: limit,
-            batch: batch,
-            cancellationToken: cancellationToken);
+            skip,
+            limit,
+            cancellationToken,
+            batch);
     }
 
     /// <inheritdoc />
@@ -66,7 +73,7 @@ public sealed class CustomerService : ICustomerService
         SearchParam search,
         CancellationToken cancellationToken = default)
     {
-        return _customers.SelectSingle(
+        return _repository.SelectSingle<Customer>(
             search,
             cancellationToken);
     }
@@ -76,10 +83,9 @@ public sealed class CustomerService : ICustomerService
         string email,
         CancellationToken cancellationToken = default)
     {
-        return _customers.SelectSingle(
+        return _repository.SelectSingle<Customer>(
             customer => customer.Email == email,
-            search: null,
-            cancellationToken: cancellationToken);
+            cancellationToken);
     }
 
     /// <inheritdoc />
@@ -87,7 +93,7 @@ public sealed class CustomerService : ICustomerService
         string code,
         CancellationToken cancellationToken = default)
     {
-        return _customers.GetByCode(
+        return _repository.GetByCode<Customer>(
             code,
             cancellationToken);
     }
@@ -97,16 +103,16 @@ public sealed class CustomerService : ICustomerService
         string text,
         int skip = 0,
         int limit = 100,
-        int? batch = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? batch = null)
     {
-        return _customers.Search(
+        return _repository.Search<Customer>(
             text,
-            searchParam: null,
-            skip: skip,
-            limit: limit,
-            batch: batch,
-            cancellationToken: cancellationToken);
+            null,
+            skip,
+            limit,
+            cancellationToken,
+            batch);
     }
 
     /// <inheritdoc />
@@ -114,7 +120,7 @@ public sealed class CustomerService : ICustomerService
         SearchParam? search = null,
         CancellationToken cancellationToken = default)
     {
-        return _customers.Count(
+        return _repository.Count<Customer>(
             search,
             cancellationToken);
     }
@@ -123,10 +129,10 @@ public sealed class CustomerService : ICustomerService
     public Task<long> CountActive(
         CancellationToken cancellationToken = default)
     {
-        return _customers.Count(
+        return _repository.Count<Customer>(
             customer => customer.Status == CustomerStatus.Active,
-            search: null,
-            cancellationToken: cancellationToken);
+            null,
+            cancellationToken);
     }
 
     /// <inheritdoc />
@@ -134,7 +140,7 @@ public sealed class CustomerService : ICustomerService
         Customer customer,
         CancellationToken cancellationToken = default)
     {
-        return _customers.Save(
+        return _repository.Save(
             customer,
             cancellationToken);
     }
@@ -142,13 +148,13 @@ public sealed class CustomerService : ICustomerService
     /// <inheritdoc />
     public Task<IReadOnlyList<Customer>> SaveBatch(
         IReadOnlyList<Customer> customers,
-        int? batch = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? batch = null)
     {
-        return _customers.Save(
+        return _repository.Save(
             customers,
-            batch,
-            cancellationToken);
+            cancellationToken,
+            batch);
     }
 
     /// <inheritdoc />
@@ -157,10 +163,35 @@ public sealed class CustomerService : ICustomerService
         int skip = 0,
         int limit = 100)
     {
-        return _customers.GenerateDebugQuery(
+        return _repository.GenerateDebugQuery<Customer>(
             search,
             skip,
             limit);
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<Customer>> SaveCustomersAndInventory(
+        IReadOnlyList<Customer> customers,
+        IReadOnlyList<Inventory> inventories,
+        CancellationToken cancellationToken = default)
+    {
+        return _transactionManager.Execute(
+            async () =>
+            {
+                var savedCustomers = await _repository.Save(
+                    customers,
+                    cancellationToken);
+
+                if (inventories.Count > 0)
+                {
+                    await _repository.Save(
+                        inventories,
+                        cancellationToken);
+                }
+
+                return savedCustomers;
+            },
+            cancellationToken);
     }
 
     /// <inheritdoc />
@@ -175,16 +206,11 @@ public sealed class CustomerService : ICustomerService
             definition.Published = true;
         }
 
-        if (string.IsNullOrWhiteSpace(definition.Code))
-        {
-            definition.DataState = DataState.New;
-        }
-        else if (definition.DataState == DataState.Unchanged)
-        {
-            definition.DataState = DataState.Changed;
-        }
+        definition.DataState = string.IsNullOrWhiteSpace(definition.Code)
+            ? DataState.New
+            : DataState.Changed;
 
-        return _extensionDefinitions.Save(
+        return _repository.Save(
             definition,
             cancellationToken);
     }
@@ -194,7 +220,7 @@ public sealed class CustomerService : ICustomerService
         string definitionCode,
         CancellationToken cancellationToken = default)
     {
-        var definition = await _extensionDefinitions.GetByCode(
+        var definition = await _repository.GetByCode<DBExtensionDefinition>(
             definitionCode,
             cancellationToken);
 
@@ -207,7 +233,7 @@ public sealed class CustomerService : ICustomerService
         definition.Published = true;
         definition.DataState = DataState.Changed;
 
-        return await _extensionDefinitions.Save(
+        return await _repository.Save(
             definition,
             cancellationToken);
     }
@@ -237,12 +263,11 @@ public sealed class CustomerService : ICustomerService
                 });
         }
 
-        return _extensionDefinitions.Select(
+        return _repository.Select<DBExtensionDefinition>(
             search,
             skip: 0,
             limit: 0,
-            batch: null,
-            cancellationToken: cancellationToken);
+            cancellationToken);
     }
 
     /// <inheritdoc />
@@ -252,7 +277,7 @@ public sealed class CustomerService : ICustomerService
         object? value,
         CancellationToken cancellationToken = default)
     {
-        var customer = await _customers.GetByCode(
+        var customer = await _repository.GetByCode<Customer>(
             customerCode,
             cancellationToken);
 
@@ -272,7 +297,7 @@ public sealed class CustomerService : ICustomerService
         extension.Data = value;
         customer.DataState = DataState.Changed;
 
-        return await _customers.Save(
+        return await _repository.Save(
             customer,
             cancellationToken);
     }

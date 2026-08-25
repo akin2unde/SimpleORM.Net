@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Http;
 
-
 /// <summary>Represents a typed outbound HTTP response.</summary>
 /// <typeparam name="T">The expected response type.</typeparam>
 public sealed class HttpResponse<T>
@@ -13,7 +12,6 @@ public sealed class HttpResponse<T>
 
         init;
 
-
     }
 
     /// <summary>Gets the numeric HTTP status code, or zero when no response was received.</summary>
@@ -22,7 +20,6 @@ public sealed class HttpResponse<T>
         get;
 
         init;
-
 
     }
 
@@ -33,7 +30,6 @@ public sealed class HttpResponse<T>
 
         init;
 
-
     }
 
     /// <summary>Gets the raw response body.</summary>
@@ -42,7 +38,6 @@ public sealed class HttpResponse<T>
         get;
 
         init;
-
 
     }
 
@@ -53,7 +48,6 @@ public sealed class HttpResponse<T>
 
         init;
 
-
     }
 
     /// <summary>Gets the response and content headers.</summary>
@@ -63,10 +57,8 @@ public sealed class HttpResponse<T>
 
         init;
 
-
     }
     =
     new Dictionary<string, IEnumerable<string>>(StringComparer.OrdinalIgnoreCase);
-
 
 }

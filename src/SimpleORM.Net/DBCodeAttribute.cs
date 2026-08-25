@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Attributes;
 
-
 /// <summary>
 /// Overrides the convention-based model code prefix and/or random suffix length.
 /// </summary>
@@ -9,7 +8,6 @@ public sealed class DBCodeAttribute : Attribute
 {
 
     private int _length;
-
 
     /// <summary>
     /// Gets or sets the code prefix. When omitted, the configured number of leading
@@ -20,7 +18,6 @@ public sealed class DBCodeAttribute : Attribute
         get;
 
         set;
-
 
     }
 
@@ -34,16 +31,13 @@ public sealed class DBCodeAttribute : Attribute
 
         get => _length;
 
-
         set
 
         {
 
             _length = value;
 
-
             HasLength = true;
-
 
         }
 
@@ -55,7 +49,6 @@ public sealed class DBCodeAttribute : Attribute
         get;
 
         private set;
-
 
     }
 

@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Configuration;
 
-
 /// <summary>Migration startup failure behavior.</summary>
 public enum MigrationFailureMode
 {

@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Configuration;
 
-
 /// <summary>Database provider selection.</summary>
 public enum DatabaseType
 {

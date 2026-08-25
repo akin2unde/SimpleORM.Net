@@ -264,7 +264,7 @@ public sealed class SampleExtensionService : IExtensionService
 
         var tenantCode =
             _options.MultiTenancy.Enabled
-                ? _tenantProvider.GetTenantCode()
+                ? _tenantProvider.GetTenant()
                 : null;
 
         var userCode =
@@ -306,7 +306,7 @@ public sealed class SampleExtensionService : IExtensionService
                     existingValue.UpdatedBy =
                         userCode;
 
-                    existingValue.TenantCode =
+                    existingValue.Tenant =
                         tenantCode;
 
                     existingValue.DataState =
@@ -351,7 +351,7 @@ public sealed class SampleExtensionService : IExtensionService
                                 data,
                                 definition.DataType),
 
-                        TenantCode =
+                        Tenant =
                             tenantCode,
 
                         CreatedAt =

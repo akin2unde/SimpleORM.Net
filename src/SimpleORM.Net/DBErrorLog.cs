@@ -1,11 +1,8 @@
 using SimpleORM.Net.Attributes;
 
-
 using SimpleORM.Net.Models;
 
-
 namespace SimpleORM.Net.SystemModels;
-
 
 /// <summary>Error log record.</summary>
 [DisableAudit,DBTable("__DBErrorLog"),DBCode(Prefix="DBE")]
@@ -114,7 +111,6 @@ public sealed class DBErrorLog:DBModel
     }
     =string.Empty;
 
-
     /// <summary>Message.</summary>
     [DBColumn(Size=-1)]
     public string Message
@@ -125,7 +121,6 @@ public sealed class DBErrorLog:DBModel
 
     }
     =string.Empty;
-
 
     /// <summary>Stack.</summary>
     [DBColumn(Size=-1)]

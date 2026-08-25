@@ -1,88 +1,67 @@
-using System.Linq.Expressions;
-
-
-using System.Security.Cryptography;
-
-
 using SimpleORM.Net.Abstractions;
-
-
-using SimpleORM.Net.Configuration;
-
-
-using SimpleORM.Net.Metadata;
-
-
-using SimpleORM.Net.Models;
-
-
-using SimpleORM.Net.Query;
-
 
 namespace SimpleORM.Net.Services;
 
-
-/// <summary>Scoped transaction manager.</summary>
-public sealed class DBTransactionManager(IDatabaseProvider provider):IDBTransactionManager
+/// <summary>Scoped transaction manager that reuses an existing transaction.</summary>
+public sealed class DBTransactionManager(IDatabaseProvider provider) : IDBTransactionManager
 {
-
     private IDBTransaction? _current;
 
+    /// <inheritdoc />
+    public bool HasTransaction => _current is not null;
 
     /// <inheritdoc />
-    public bool HasTransaction=>_current is not null;
-
-
-    /// <inheritdoc />
-    public IDBTransaction? Current=>_current;
-
+    public IDBTransaction? Current => _current;
 
     /// <inheritdoc />
-    public async Task Execute(Func<Task> action,CancellationToken ct=default)=>_=await Execute(async()=>
+    public async Task Execute(
+        Func<Task> action,
+        CancellationToken cancellationToken = default)
     {
-        await action();
-return true;
-
+        await Execute(
+            async () =>
+            {
+                await action();
+                return true;
+            },
+            cancellationToken);
     }
-    ,ct);
-
 
     /// <inheritdoc />
-    public async Task<TResult> Execute<TResult>(Func<Task<TResult>> action,CancellationToken ct=default)
+    public async Task<TResult> Execute<TResult>(
+        Func<Task<TResult>> action,
+        CancellationToken cancellationToken = default)
     {
-        if(_current is not null)return await action();
+        if (_current is not null)
+        {
+            return await action();
+        }
 
-        await using var tx=await provider.BeginTransaction(ct);
-
-        _current=tx;
+        await using var transaction = await provider.BeginTransaction(cancellationToken);
+        _current = transaction;
 
         try
         {
-            var r=await action();
-
-            await tx.Commit(ct);
-
-            return r;
-
+            var result = await action();
+            await transaction.Commit(cancellationToken);
+            return result;
         }
         catch
         {
             try
             {
-                await tx.Rollback(ct);
-
+                await transaction.Rollback(cancellationToken);
             }
             catch
             {
+                // Preserve the original operation exception.
             }
-            throw;
 
+            throw;
         }
         finally
         {
-            _current=null;
-
+            _current = null;
         }
     }
-
 }

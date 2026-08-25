@@ -1,20 +1,14 @@
 using System.Dynamic;
 
-
 using System.Net.Http.Headers;
-
 
 using System.Text;
 
-
 using System.Text.Json;
-
 
 using Microsoft.Extensions.DependencyInjection;
 
-
 namespace SimpleORM.Net.Http;
-
 
 /// <summary>HTTP request options.</summary>
 public sealed class HttpRequestOptions
@@ -30,7 +24,6 @@ public sealed class HttpRequestOptions
     }
     =string.Empty;
 
-
     /// <summary>Method.</summary>
     public HttpMethodType Method
     {
@@ -41,7 +34,6 @@ public sealed class HttpRequestOptions
     }
     =HttpMethodType.Get;
 
-
     /// <summary>Body type.</summary>
     public HttpBodyType BodyType
     {
@@ -51,7 +43,6 @@ public sealed class HttpRequestOptions
 
     }
     =HttpBodyType.Json;
-
 
     /// <summary>Payload.</summary>
     public object? Payload
@@ -70,7 +61,6 @@ public sealed class HttpRequestOptions
     }
     =new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
 
-
     /// <summary>Query values.</summary>
     public IDictionary<string,string?> Query
     {
@@ -78,7 +68,6 @@ public sealed class HttpRequestOptions
 
     }
     =new Dictionary<string,string?>();
-
 
     /// <summary>Bearer token.</summary>
     public string? BearerToken

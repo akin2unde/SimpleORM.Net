@@ -1,11 +1,8 @@
 using SimpleORM.Net.Attributes;
 
-
 using SimpleORM.Net.Models;
 
-
 namespace SimpleORM.Net.SystemModels;
-
 
 /// <summary>Extension definition.</summary>
 [DisableAudit,DBTable("__DBExtensionDefinition"),DBCode(Prefix="EXT")]
@@ -23,7 +20,6 @@ public sealed class DBExtensionDefinition:DBModel
     }
     =string.Empty;
 
-
     /// <summary>Field code.</summary>
     [Unique("ModelField")]
     public string FieldCode
@@ -35,7 +31,6 @@ public sealed class DBExtensionDefinition:DBModel
     }
     =string.Empty;
 
-
     /// <summary>Friendly name.</summary>
     public string FieldName
     {
@@ -45,7 +40,6 @@ public sealed class DBExtensionDefinition:DBModel
 
     }
     =string.Empty;
-
 
     /// <summary>Data type.</summary>
     public ExtensionDataType DataType

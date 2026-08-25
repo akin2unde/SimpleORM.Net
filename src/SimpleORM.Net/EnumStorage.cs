@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Configuration;
 
-
 /// <summary>Enum persistence format.</summary>
 public enum EnumStorage
 {

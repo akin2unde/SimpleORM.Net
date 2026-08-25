@@ -6,91 +6,91 @@ namespace SimpleORM.Net.Sample.Api;
 
 /// <summary>
 /// Application service used by the sample controller.
-/// It demonstrates every public method on <c>IDataService&lt;Customer&gt;</c>
+/// It demonstrates every public method on <c>IDataRepository</c>
 /// together with extension definition, publishing and extension-value usage.
 /// </summary>
 public interface ICustomerService
 {
     /// <summary>
-    /// Demonstrates IDataService.Select(SearchParam,...).
+    /// Demonstrates IDataRepository.Select(SearchParam,...).
     /// </summary>
     Task<PagedResult<Customer>> Select(
         SearchParam? search = null,
         int skip = 0,
         int limit = 100,
-        int? batch = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        int? batch = null);
 
     /// <summary>
-    /// Demonstrates IDataService.Select(expression,...).
+    /// Demonstrates IDataRepository.Select(expression,...).
     /// </summary>
     Task<PagedResult<Customer>> SelectActive(
         int skip = 0,
         int limit = 100,
-        int? batch = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        int? batch = null);
 
     /// <summary>
-    /// Demonstrates IDataService.SelectSingle(SearchParam,...).
+    /// Demonstrates IDataRepository.SelectSingle(SearchParam,...).
     /// </summary>
     Task<Customer?> SelectSingle(
         SearchParam search,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Demonstrates IDataService.SelectSingle(expression,...).
+    /// Demonstrates IDataRepository.SelectSingle(expression,...).
     /// </summary>
     Task<Customer?> SelectSingleByEmail(
         string email,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Demonstrates IDataService.GetByCode(...).
+    /// Demonstrates IDataRepository.GetByCode(...).
     /// </summary>
     Task<Customer?> GetByCode(
         string code,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Demonstrates IDataService.Search(...).
+    /// Demonstrates IDataRepository.Search(...).
     /// </summary>
     Task<PagedResult<Customer>> Search(
         string text,
         int skip = 0,
         int limit = 100,
-        int? batch = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        int? batch = null);
 
     /// <summary>
-    /// Demonstrates IDataService.Count(SearchParam,...).
+    /// Demonstrates IDataRepository.Count(SearchParam,...).
     /// </summary>
     Task<long> Count(
         SearchParam? search = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Demonstrates IDataService.Count(expression,...).
+    /// Demonstrates IDataRepository.Count(expression,...).
     /// </summary>
     Task<long> CountActive(
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Demonstrates IDataService.Save(single).
+    /// Demonstrates IDataRepository.Save(single).
     /// </summary>
     Task<Customer> Save(
         Customer customer,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Demonstrates IDataService.Save(batch).
+    /// Demonstrates IDataRepository.Save(batch).
     /// </summary>
     Task<IReadOnlyList<Customer>> SaveBatch(
         IReadOnlyList<Customer> customers,
-        int? batch = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        int? batch = null);
 
     /// <summary>
-    /// Demonstrates IDataService.GenerateDebugQuery(...).
+    /// Demonstrates IDataRepository.GenerateDebugQuery(...).
     /// </summary>
     string GenerateDebugQuery(
         SearchParam? search = null,
@@ -126,4 +126,10 @@ public interface ICustomerService
         string extensionCode,
         object? value,
         CancellationToken cancellationToken = default);
+    /// <summary>Demonstrates multiple repository saves in one transaction.</summary>
+    Task<IReadOnlyList<Customer>> SaveCustomersAndInventory(
+        IReadOnlyList<Customer> customers,
+        IReadOnlyList<Inventory> inventories,
+        CancellationToken cancellationToken = default);
+
 }

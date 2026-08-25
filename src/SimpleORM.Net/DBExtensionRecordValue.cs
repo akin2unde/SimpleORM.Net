@@ -1,11 +1,8 @@
 using SimpleORM.Net.Attributes;
 
-
 using SimpleORM.Net.Models;
 
-
 namespace SimpleORM.Net.SystemModels;
-
 
 /// <summary>Extension record value.</summary>
 [DisableAudit,DBTable("__DBExtensionValue"),DBCode(Prefix="EXV")]
@@ -23,7 +20,6 @@ public sealed class DBExtensionRecordValue:DBModel
     }
     =string.Empty;
 
-
     /// <summary>Record code.</summary>
     [Unique("ModelRecordField")]
     public string ModelCode
@@ -35,7 +31,6 @@ public sealed class DBExtensionRecordValue:DBModel
     }
     =string.Empty;
 
-
     /// <summary>Field code.</summary>
     [Unique("ModelRecordField")]
     public string FieldCode
@@ -46,7 +41,6 @@ public sealed class DBExtensionRecordValue:DBModel
 
     }
     =string.Empty;
-
 
     /// <summary>Serialized value.</summary>
     [DBColumn(Size=-1)]

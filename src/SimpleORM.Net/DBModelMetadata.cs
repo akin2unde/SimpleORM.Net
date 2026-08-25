@@ -1,20 +1,14 @@
 using System.Collections.Concurrent;
 
-
 using System.Reflection;
-
 
 using SimpleORM.Net.Attributes;
 
-
 using SimpleORM.Net.Configuration;
-
 
 using SimpleORM.Net.Models;
 
-
 namespace SimpleORM.Net.Metadata;
-
 
 /// <summary>Cached model metadata.</summary>
 public sealed class DBModelMetadata
@@ -122,9 +116,7 @@ public sealed class DBModelMetadata
     /// <summary>Persisted columns.</summary>
     public IEnumerable<DBColumnMetadata> PersistedColumns=>Columns.Where(x=>!x.Ignore);
 
-
     /// <summary>Searchable columns.</summary>
     public IEnumerable<DBColumnMetadata> SearchableColumns=>Columns.Where(x=>x.Searchable&&!x.Ignore);
-
 
 }

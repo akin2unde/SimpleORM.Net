@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Configuration;
 
-
 /// <summary>SQL migration configuration.</summary>
 public sealed class MigrationOptions
 {
@@ -23,6 +22,5 @@ public sealed class MigrationOptions
 
     }
     =MigrationFailureMode.StopApplication;
-
 
 }

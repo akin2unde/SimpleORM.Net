@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Query;
 
-
 /// <summary>Single filter.</summary>
 public sealed class SearchFilter
 {
@@ -14,7 +13,6 @@ public sealed class SearchFilter
 
     }
     =string.Empty;
-
 
     /// <summary>Operator.</summary>
     public SearchOperator Operator

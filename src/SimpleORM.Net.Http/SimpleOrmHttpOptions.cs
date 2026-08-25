@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Http;
 
-
 /// <summary>Configures the SimpleORM.Net outbound HTTP wrapper.</summary>
 public sealed class SimpleOrmHttpOptions
 {
@@ -12,10 +11,8 @@ public sealed class SimpleOrmHttpOptions
 
         set;
 
-
     }
     = TimeSpan.FromSeconds(30);
-
 
     /// <summary>Gets or sets a value indicating whether HTTP and transport failures should throw exceptions.</summary>
     public bool ThrowOnError
@@ -24,7 +21,6 @@ public sealed class SimpleOrmHttpOptions
 
         set;
 
-
     }
 
     /// <summary>Gets headers applied to every request unless overridden by request-specific headers.</summary>
@@ -32,10 +28,8 @@ public sealed class SimpleOrmHttpOptions
     {
         get;
 
-
     }
     =
     new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
 
 }

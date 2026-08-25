@@ -1,12 +1,31 @@
+using System.Security.Cryptography;
 using SimpleORM.Net.Attributes;
 
-
 namespace SimpleORM.Net.Models;
-
 
 /// <summary>Base type for every persisted model.</summary>
 public abstract class DBModel
 {
+    /// <summary>Globally unique business code.</summary>
+    private const string CodeAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+    /// <summary>Returns the prefix used when generating a code for this model.</summary>
+    public virtual string GetPrefix()
+    {
+        var name = GetType().Name;
+        return name[..Math.Min(3, name.Length)].ToUpperInvariant();
+    }
+
+    /// <summary>Generates a code for this model instance.</summary>
+    public virtual string GenerateCode(int length = 10, string separator = "-")
+    {
+        if (length < 4)
+        {
+            throw new ArgumentOutOfRangeException(nameof(length), "Code length must be at least 4.");
+        }
+
+        return $"{GetPrefix()}{separator}{RandomNumberGenerator.GetString(CodeAlphabet, length)}";
+    }
 
     /// <summary>Globally unique business code.</summary>
     public virtual string Code
@@ -15,10 +34,8 @@ public abstract class DBModel
 
         set;
 
-
     }
     = string.Empty;
-
 
     /// <summary>Current persistence instruction.</summary>
     [Ignore]
@@ -28,18 +45,15 @@ public abstract class DBModel
 
         set;
 
-
     }
     = DataState.New;
 
-
     /// <summary>Tenant code.</summary>
-    public virtual string? TenantCode
+    public virtual string? Tenant
     {
         get;
 
         set;
-
 
     }
 
@@ -50,7 +64,6 @@ public abstract class DBModel
 
         set;
 
-
     }
 
     /// <summary>UTC last update.</summary>
@@ -59,7 +72,6 @@ public abstract class DBModel
         get;
 
         set;
-
 
     }
 
@@ -70,7 +82,6 @@ public abstract class DBModel
 
         set;
 
-
     }
 
     /// <summary>Creator code.</summary>
@@ -79,7 +90,6 @@ public abstract class DBModel
         get;
 
         set;
-
 
     }
 
@@ -90,20 +100,17 @@ public abstract class DBModel
 
         set;
 
-
     }
 
     /// <summary>Dynamic extensions; never stored in the base table/collection.</summary>
     [Ignore]
-    public virtual IDictionary<string,ExtensionValue> Extended
+    public virtual IDictionary<string, ExtensionValue> Extended
     {
         get;
 
         set;
 
-
     }
-    = new Dictionary<string,ExtensionValue>(StringComparer.OrdinalIgnoreCase);
-
+    = new Dictionary<string, ExtensionValue>(StringComparer.OrdinalIgnoreCase);
 
 }

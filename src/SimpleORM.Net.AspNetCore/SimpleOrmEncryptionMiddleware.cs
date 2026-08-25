@@ -1,32 +1,22 @@
 using System.Security.Cryptography;
 
-
 using System.Text;
-
 
 using System.Text.Json;
 
-
 using Microsoft.AspNetCore.Builder;
-
 
 using Microsoft.AspNetCore.Http;
 
-
 using Microsoft.Extensions.DependencyInjection;
-
 
 using Microsoft.Extensions.Logging;
 
-
 using SimpleORM.Net.Abstractions;
-
 
 using SimpleORM.Net.Configuration;
 
-
 namespace SimpleORM.Net.AspNetCore;
-
 
 /// <summary>Optional hybrid RSA/AES middleware.</summary>
 public sealed class SimpleOrmEncryptionMiddleware(RequestDelegate next)
@@ -45,7 +35,6 @@ public sealed class SimpleOrmEncryptionMiddleware(RequestDelegate next)
         }
 
         if(string.IsNullOrWhiteSpace(o.Encryption.PublicKey)||string.IsNullOrWhiteSpace(o.Encryption.PrivateKey))throw new InvalidOperationException("Encryption keys are required.");
-
 
         if(context.Request.ContentLength is >0){var json=await new StreamReader(context.Request.Body).ReadToEndAsync();
 
@@ -78,7 +67,6 @@ public sealed class SimpleOrmEncryptionMiddleware(RequestDelegate next)
     context.Response.ContentType="application/json";
 
     await context.Response.WriteAsync(JsonSerializer.Serialize(output));
-
 
 }
 

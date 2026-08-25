@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Configuration;
 
-
 /// <summary>Batch conventions.</summary>
 public sealed class BatchOptions
 {
@@ -15,7 +14,6 @@ public sealed class BatchOptions
     }
     =100;
 
-
     /// <summary>Select batch.</summary>
     public int Select
     {
@@ -25,6 +23,5 @@ public sealed class BatchOptions
 
     }
     =100;
-
 
 }

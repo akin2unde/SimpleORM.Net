@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Query;
 
-
 /// <summary>User filter combination.</summary>
 public enum SearchCondition
 {

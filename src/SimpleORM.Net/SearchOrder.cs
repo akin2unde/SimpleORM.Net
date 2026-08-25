@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Query;
 
-
 /// <summary>Sort.</summary>
 public sealed class SearchOrder
 {
@@ -14,7 +13,6 @@ public sealed class SearchOrder
 
     }
     =string.Empty;
-
 
     /// <summary>Descending.</summary>
     public bool Descending

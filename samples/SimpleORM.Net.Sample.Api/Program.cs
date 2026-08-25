@@ -15,8 +15,9 @@ namespace SimpleORM.Net.Sample.Api;
 public static class Program
 {
     /// <summary>
-    /// Builds and runs the sample API.
+    /// Builds, configures, and runs the sample API.
     /// </summary>
+    /// <param name="args">Command-line arguments supplied to the application.</param>
     public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
@@ -24,7 +25,7 @@ public static class Program
         var provider = ResolveProvider(
             builder.Configuration["SimpleOrm:Provider"]);
 
-        builder.Services.AddSimpleOrmCore(
+        builder.Services.AddSimpleOrm(
             options => ConfigureSimpleOrm(
                 options,
                 builder.Configuration,
@@ -43,7 +44,7 @@ public static class Program
 
         builder.Services.AddSimpleOrmAspNetCore();
 
-        // AddSimpleOrmCore registers DefaultExtensionService. The sample replaces it
+        // AddSimpleOrm registers DefaultExtensionService. The sample replaces it
         // with a database-backed implementation so Customer.Extended is demonstrated
         // end to end without changing the core public contracts.
         builder.Services.AddScoped<IExtensionService, SampleExtensionService>();

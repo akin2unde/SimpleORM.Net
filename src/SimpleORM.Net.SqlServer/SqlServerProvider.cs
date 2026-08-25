@@ -837,7 +837,7 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
                 ?? throw new InvalidOperationException(
                     $"Multi-tenancy is enabled, but model '{metadata.ModelName}' has no tenant column.");
 
-            var tenantCode = _tenant.GetTenantCode();
+            var tenantCode = _tenant.GetTenant();
 
             if (string.IsNullOrWhiteSpace(tenantCode))
             {
@@ -1338,7 +1338,7 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
             ?? throw new InvalidOperationException(
                 $"Multi-tenancy is enabled, but model '{metadata.ModelName}' has no tenant column.");
 
-        var tenantCode = _tenant.GetTenantCode();
+        var tenantCode = _tenant.GetTenant();
 
         if (string.IsNullOrWhiteSpace(tenantCode))
         {

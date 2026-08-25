@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Query;
 
-
 /// <summary>Join request.</summary>
 public sealed class SearchJoin
 {
@@ -15,7 +14,6 @@ public sealed class SearchJoin
     }
     =typeof(object);
 
-
     /// <summary>Local property.</summary>
     public string LocalField
     {
@@ -25,7 +23,6 @@ public sealed class SearchJoin
 
     }
     =string.Empty;
-
 
     /// <summary>Foreign property.</summary>
     public string ForeignField
@@ -37,7 +34,6 @@ public sealed class SearchJoin
     }
     =string.Empty;
 
-
     /// <summary>Join mode.</summary>
     public JoinType Type
     {
@@ -47,7 +43,6 @@ public sealed class SearchJoin
 
     }
     =JoinType.Inner;
-
 
     /// <summary>Alias.</summary>
     public string? Alias
@@ -65,6 +60,5 @@ public sealed class SearchJoin
 
     }
     =new List<string>();
-
 
 }

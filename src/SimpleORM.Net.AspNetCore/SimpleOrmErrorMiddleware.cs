@@ -1,32 +1,22 @@
 using System.Security.Cryptography;
 
-
 using System.Text;
-
 
 using System.Text.Json;
 
-
 using Microsoft.AspNetCore.Builder;
-
 
 using Microsoft.AspNetCore.Http;
 
-
 using Microsoft.Extensions.DependencyInjection;
-
 
 using Microsoft.Extensions.Logging;
 
-
 using SimpleORM.Net.Abstractions;
-
 
 using SimpleORM.Net.Configuration;
 
-
 namespace SimpleORM.Net.AspNetCore;
-
 
 /// <summary>Optional request error middleware. It logs through ILogger and is designed for a DB error sink to be added without changing the middleware contract.</summary>
 public sealed class SimpleOrmErrorMiddleware(RequestDelegate next)

@@ -1,20 +1,14 @@
 using System.Collections.Concurrent;
 
-
 using System.Reflection;
-
 
 using SimpleORM.Net.Attributes;
 
-
 using SimpleORM.Net.Configuration;
-
 
 using SimpleORM.Net.Models;
 
-
 namespace SimpleORM.Net.Metadata;
-
 
 /// <summary>Cached property metadata.</summary>
 public sealed class DBColumnMetadata

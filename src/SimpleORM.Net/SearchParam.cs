@@ -1,6 +1,5 @@
 namespace SimpleORM.Net.Query;
 
-
 /// <summary>Provider-neutral selection/search request; pagination is method-level.</summary>
 public sealed class SearchParam
 {
@@ -22,7 +21,6 @@ public sealed class SearchParam
     }
     =new List<string>();
 
-
     /// <summary>Filters.</summary>
     public IList<SearchFilter> Filters
     {
@@ -30,7 +28,6 @@ public sealed class SearchParam
 
     }
     =new List<SearchFilter>();
-
 
     /// <summary>Joins.</summary>
     public IList<SearchJoin> Joins
@@ -40,7 +37,6 @@ public sealed class SearchParam
     }
     =new List<SearchJoin>();
 
-
     /// <summary>Main-model projected fields; empty means all persisted.</summary>
     public IList<string> Fields
     {
@@ -49,7 +45,6 @@ public sealed class SearchParam
     }
     =new List<string>();
 
-
     /// <summary>Ordering.</summary>
     public IList<SearchOrder> OrderBy
     {
@@ -57,7 +52,6 @@ public sealed class SearchParam
 
     }
     =new List<SearchOrder>();
-
 
     /// <summary>User filter combination.</summary>
     public SearchCondition Condition
@@ -68,7 +62,6 @@ public sealed class SearchParam
 
     }
     =SearchCondition.And;
-
 
     /// <summary>Include soft-deleted rows.</summary>
     public bool IncludeDeleted

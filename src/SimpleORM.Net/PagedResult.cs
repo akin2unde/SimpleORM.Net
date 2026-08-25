@@ -1,8 +1,6 @@
 using SimpleORM.Net.Attributes;
 
-
 namespace SimpleORM.Net.Models;
-
 
 /// <summary>Paged or fetch-all result.</summary>
 public sealed class PagedResult<T>
@@ -15,10 +13,8 @@ public sealed class PagedResult<T>
 
         init;
 
-
     }
     = Array.Empty<T>();
-
 
     /// <summary>Total matching records before skip/limit.</summary>
     public long TotalRecords
@@ -26,7 +22,6 @@ public sealed class PagedResult<T>
         get;
 
         init;
-
 
     }
 
@@ -37,7 +32,6 @@ public sealed class PagedResult<T>
 
         init;
 
-
     }
 
     /// <summary>Logical limit; zero means all remaining.</summary>
@@ -46,7 +40,6 @@ public sealed class PagedResult<T>
         get;
 
         init;
-
 
     }
 

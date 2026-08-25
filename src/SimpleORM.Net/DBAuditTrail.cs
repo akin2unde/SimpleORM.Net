@@ -1,11 +1,8 @@
 using SimpleORM.Net.Attributes;
 
-
 using SimpleORM.Net.Models;
 
-
 namespace SimpleORM.Net.SystemModels;
-
 
 /// <summary>Audit trail record.</summary>
 [DisableAudit,DBTable("__DBAuditTrail"),DBCode(Prefix="AUD")]
@@ -22,7 +19,6 @@ public sealed class DBAuditTrail:DBModel
     }
     =string.Empty;
 
-
     /// <summary>Record code.</summary>
     public string RecordCode
     {
@@ -32,7 +28,6 @@ public sealed class DBAuditTrail:DBModel
 
     }
     =string.Empty;
-
 
     /// <summary>Action.</summary>
     public AuditAction Action

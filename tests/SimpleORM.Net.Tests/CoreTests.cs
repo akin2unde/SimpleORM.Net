@@ -1,20 +1,14 @@
 using SimpleORM.Net.Attributes;
 
-
 using SimpleORM.Net.Configuration;
-
 
 using SimpleORM.Net.Metadata;
 
-
 using SimpleORM.Net.Models;
-
 
 using SimpleORM.Net.Services;
 
-
 namespace SimpleORM.Net.Tests;
-
 
 /// <summary>Convention tests.</summary>
 public sealed class CoreTests
@@ -46,7 +40,6 @@ public sealed class CoreTests
     [Theory][InlineData(100,100,100)][InlineData(1000,100,500)][InlineData(null,250,250)]
     public void BatchResolution(int? request,int configured,int expected)=>Assert.Equal(expected,BatchResolver.Resolve(request,configured));
 
-
     /// <summary>Code format.</summary>
     [Fact]
     public void CodeFormat()
@@ -68,6 +61,5 @@ public sealed class CoreTests
         DefaultStringLength=50
     }
     ;
-
 
 }

@@ -8,9 +8,7 @@ using SimpleORM.Net.Configuration;
 
 using SimpleORM.Net.Models;
 
-
 namespace SimpleORM.Net.Metadata;
-
 
 /// <summary>
 /// Reflection-once application-lifetime metadata cache.
@@ -20,7 +18,6 @@ public sealed class DBMetadataProvider : IDBMetadataProvider
     private readonly SimpleOrmOptions _options;
 
     private readonly ConcurrentDictionary<Type, DBModelMetadata> _cache = new();
-
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DBMetadataProvider"/> class.
@@ -72,21 +69,17 @@ public sealed class DBMetadataProvider : IDBMetadataProvider
     {
         var codeAttribute = type.GetCustomAttribute<DBCodeAttribute>(true);
 
-
         var prefixLength = Math.Min(
             Math.Max(1, _options.CodeGeneration.PrefixLength),
             type.Name.Length);
-
 
         var prefix = string.IsNullOrWhiteSpace(codeAttribute?.Prefix)
             ? type.Name[..prefixLength].ToUpperInvariant()
             : codeAttribute!.Prefix!.Trim().ToUpperInvariant();
 
-
         var codeLength = codeAttribute is { HasLength: true }
             ? codeAttribute.Length
             : _options.CodeGeneration.Length;
-
 
         if (codeLength < 4)
         {
@@ -100,7 +93,6 @@ public sealed class DBMetadataProvider : IDBMetadataProvider
             .Where(property => property.CanRead && property.CanWrite)
             .Select(BuildColumn)
             .ToArray();
-
 
         return new DBModelMetadata
         {
@@ -117,7 +109,7 @@ public sealed class DBMetadataProvider : IDBMetadataProvider
             CodeColumn = columns.Single(
                 column => column.PropertyName == nameof(DBModel.Code)),
             TenantColumn = columns.SingleOrDefault(
-                column => column.PropertyName == nameof(DBModel.TenantCode))
+                column => column.PropertyName == nameof(DBModel.Tenant))
         };
 
     }
@@ -131,14 +123,11 @@ public sealed class DBMetadataProvider : IDBMetadataProvider
         var underlyingType = Nullable.GetUnderlyingType(propertyType)
             ?? propertyType;
 
-
         var ignored = property.IsDefined(typeof(IgnoreAttribute), true);
 
         var isEnum = underlyingType.IsEnum;
 
-
         EnumStorage? enumStorage = null;
-
 
         if (isEnum)
         {
@@ -149,7 +138,6 @@ public sealed class DBMetadataProvider : IDBMetadataProvider
         }
 
         int? size = null;
-
 
         if (underlyingType == typeof(string)
             || (isEnum && enumStorage == EnumStorage.String))
@@ -164,14 +152,11 @@ public sealed class DBMetadataProvider : IDBMetadataProvider
             .GetCustomAttributes<UniqueAttribute>(true)
             .FirstOrDefault();
 
-
         var defaultOnReturn = property.IsDefined(
             typeof(DefaultOnReturnAttribute),
             true);
 
-
-        var isTenantCode = property.Name == nameof(DBModel.TenantCode);
-
+        var isTenantCode = property.Name == nameof(DBModel.Tenant);
 
         return new DBColumnMetadata
         {

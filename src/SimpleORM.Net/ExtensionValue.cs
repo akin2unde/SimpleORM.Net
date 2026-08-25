@@ -1,8 +1,6 @@
 using SimpleORM.Net.Attributes;
 
-
 namespace SimpleORM.Net.Models;
-
 
 /// <summary>Dynamic extension definition plus a record value.</summary>
 public sealed class ExtensionValue
@@ -15,10 +13,8 @@ public sealed class ExtensionValue
 
         set;
 
-
     }
     = string.Empty;
-
 
     /// <summary>Friendly name.</summary>
     public string Name
@@ -27,10 +23,8 @@ public sealed class ExtensionValue
 
         set;
 
-
     }
     = string.Empty;
-
 
     /// <summary>Declared type.</summary>
     public ExtensionDataType DataType
@@ -38,7 +32,6 @@ public sealed class ExtensionValue
         get;
 
         set;
-
 
     }
 
@@ -49,7 +42,6 @@ public sealed class ExtensionValue
 
         set;
 
-
     }
 
     /// <summary>Optional max size.</summary>
@@ -59,7 +51,6 @@ public sealed class ExtensionValue
 
         set;
 
-
     }
 
     /// <summary>Current record value.</summary>
@@ -68,7 +59,6 @@ public sealed class ExtensionValue
         get;
 
         set;
-
 
     }
 
