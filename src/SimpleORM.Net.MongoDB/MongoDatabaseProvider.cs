@@ -5,7 +5,7 @@ using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 
 using MongoDB.Bson;
-
+using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 
 using SimpleORM.Net.Abstractions;
@@ -46,7 +46,7 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
         var c = o.Connection;
 
         var cs = string.IsNullOrWhiteSpace(c.Username) ? $"mongodb://{c.Host}:{c.Port}" : $"mongodb://{Uri.EscapeDataString(c.Username)}:{Uri.EscapeDataString(c.Password ?? "")}@{c.Host}:{c.Port}/{c.Database}";
-
+        cs += "?replicaSet=rs0&directConnection=true";
         _client = new MongoClient(cs);
 
         _db = _client.GetDatabase(c.Database);
@@ -91,15 +91,77 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
     public Task<long> Count<T>(SearchParam p, CancellationToken ct = default) where T : DBModel => Col<T>().CountDocumentsAsync(Filter<T>(p), cancellationToken: ct);
 
     /// <inheritdoc />
-    public Task Insert<T>(IReadOnlyList<T> x, IDBTransaction tr, CancellationToken ct = default) where T : DBModel => Col<T>().InsertManyAsync(As(tr).Session, x, cancellationToken: ct);
+    public async Task Insert<T>(IReadOnlyList<T> x, IDBTransaction tr, CancellationToken ct = default) where T : DBModel
+    {
+        if (x.Count == 0)
+        {
+            return;
+        }
+
+        var metadata = _m.GetMetadata<T>();
+        var documents = ToPersistedDocuments(x);
+
+        var collection = _db.GetCollection<BsonDocument>(
+            metadata.TableName);
+
+        await collection.InsertManyAsync(
+            As(tr).Session,
+            documents,
+            cancellationToken: ct);
+
+    }
 
     /// <inheritdoc />
-    public async Task Update<T>(IReadOnlyList<T> x, IDBTransaction tr, CancellationToken ct = default) where T : DBModel
+    // public async Task Update<T>(IReadOnlyList<T> x, IDBTransaction tr, CancellationToken ct = default) where T : DBModel
+    // {
+    //     var w = x.Select(v => new ReplaceOneModel<T>(Scoped<T>(Builders<T>.Filter.Eq(y => y.Code, v.Code), false), v)).Cast<WriteModel<T>>().ToArray();
+
+    //     if (w.Length > 0) await Col<T>().BulkWriteAsync(As(tr).Session, w, cancellationToken: ct);
+
+    // }
+    public async Task Update<T>(
+    IReadOnlyList<T> models,
+    IDBTransaction transaction,
+    CancellationToken cancellationToken = default)
+    where T : DBModel
     {
-        var w = x.Select(v => new ReplaceOneModel<T>(Scoped<T>(Builders<T>.Filter.Eq(y => y.Code, v.Code), false), v)).Cast<WriteModel<T>>().ToArray();
+        ArgumentNullException.ThrowIfNull(models);
 
-        if (w.Length > 0) await Col<T>().BulkWriteAsync(As(tr).Session, w, cancellationToken: ct);
+        if (models.Count == 0)
+        {
+            return;
+        }
 
+        var metadata = _m.GetMetadata<T>();
+
+        var collection = _db.GetCollection<BsonDocument>(
+            metadata.TableName);
+
+        var writes = models
+            .Select(model =>
+            {
+                var document = ToPersistedDocument(
+                    model,
+                    metadata);
+
+                var filter = CreateUpdateFilter(
+                    model,
+                    metadata);
+
+                return new ReplaceOneModel<BsonDocument>(
+                    filter,
+                    document)
+                {
+                    IsUpsert = model.Upsert
+                };
+            })
+            .Cast<WriteModel<BsonDocument>>()
+            .ToArray();
+
+        await collection.BulkWriteAsync(
+            As(transaction).Session,
+            writes,
+            cancellationToken: cancellationToken);
     }
 
     /// <inheritdoc />
@@ -158,9 +220,104 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
     public Task<long> Execute(string q, object? p = null, CancellationToken ct = default) => throw new NotSupportedException("Mongo raw Execute is not generalized in MVP.");
 
     internal IMongoDatabase Database => _db;
+    private IReadOnlyList<BsonDocument> ToPersistedDocuments<T>(
+        IReadOnlyList<T> models)
+        where T : DBModel
+    {
+        var metadata = _m.GetMetadata<T>();
 
-    private IMongoCollection<T> Col<T>() where T : DBModel => _db.GetCollection<T>(_m.GetMetadata<T>().TableName);
+        var persistedNames = metadata.PersistedColumns
+            .Select(column => column.ColumnName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        return models
+            .Select(model =>
+            {
+                var serialized = model.ToBsonDocument();
+
+                return new BsonDocument(
+                    serialized.Elements.Where(element =>
+                        persistedNames.Contains(element.Name)));
+            })
+            .ToList();
+    }
+    private FilterDefinition<BsonDocument> CreateUpdateFilter<T>(
+    T model,
+    DBModelMetadata metadata)
+    where T : DBModel
+    {
+        var builder = Builders<BsonDocument>.Filter;
+        var filters = new List<FilterDefinition<BsonDocument>>();
+
+        var codeColumn = metadata.Columns.First(
+            column => string.Equals(
+                column.PropertyName,
+                nameof(DBModel.Code),
+                StringComparison.OrdinalIgnoreCase));
+
+        filters.Add(
+            builder.Eq(
+                codeColumn.ColumnName,
+                model.Code));
+
+        if (_o.MultiTenancy.Enabled)
+        {
+            var tenant = _t.GetTenant()
+                ?? throw new InvalidOperationException(
+                    "Tenant is required.");
+
+            var tenantColumn = metadata.Columns.First(
+                column => string.Equals(
+                    column.PropertyName,
+                    nameof(DBModel.Tenant),
+                    StringComparison.OrdinalIgnoreCase));
+
+            filters.Add(
+                builder.Eq(
+                    tenantColumn.ColumnName,
+                    tenant));
+        }
+
+        if (!metadata.HardDelete)
+        {
+            var deletedAtColumn = metadata.Columns.First(
+                column => string.Equals(
+                    column.PropertyName,
+                    nameof(DBModel.DeletedAt),
+                    StringComparison.OrdinalIgnoreCase));
+
+            filters.Add(
+                builder.Eq(
+                    deletedAtColumn.ColumnName,
+                    BsonNull.Value));
+        }
+
+        return builder.And(filters);
+    }
+    private static BsonDocument ToPersistedDocument<T>(
+    T model,
+    DBModelMetadata metadata)
+    where T : DBModel
+    {
+        var serializedDocument = model.ToBsonDocument();
+
+        var persistedColumnNames = metadata.PersistedColumns
+            .Select(column => column.ColumnName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return new BsonDocument(
+            serializedDocument.Elements.Where(element =>
+                persistedColumnNames.Contains(element.Name)));
+    }
+    private IMongoCollection<T> Col<T>()
+          where T : DBModel
+    {
+
+        var metadata = _m.GetMetadata<T>();
+
+        return _db.GetCollection<T>(
+            metadata.TableName);
+    }
     private FilterDefinition<T> Filter<T>(SearchParam p) where T : DBModel
     {
         var b = Builders<T>.Filter;

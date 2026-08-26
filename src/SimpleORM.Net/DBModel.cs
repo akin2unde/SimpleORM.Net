@@ -48,6 +48,17 @@ public abstract class DBModel
     }
     = DataState.New;
 
+    /// <summary>Set upsert.</summary>
+    [Ignore]
+    public bool Upsert
+    {
+        get;
+
+        set;
+
+    }
+    = false;
+
     /// <summary>Tenant code.</summary>
     public virtual string? Tenant
     {

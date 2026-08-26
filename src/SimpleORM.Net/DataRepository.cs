@@ -48,7 +48,21 @@ public sealed class DataRepository(
     /// <inheritdoc />
     public Task<PagedResult<T>> Select<T>(Expression<Func<T, bool>> expression, int skip = 0, int limit = 100, CancellationToken cancellationToken = default, int? batch = null) where T : DBModel =>
         Select(expression, null, skip, limit, cancellationToken, batch);
-
+    /// <inheritdoc />
+    public Task<PagedResult<T>> Select<T>(
+        int skip = 0,
+        int limit = 100,
+        CancellationToken cancellationToken = default,
+        int? batch = null)
+        where T : DBModel
+    {
+        return Select<T>(
+        expression: item => true,
+        skip: skip,
+        limit: limit,
+        cancellationToken: cancellationToken,
+        batch: batch);
+    }
     /// <inheritdoc />
     public Task<PagedResult<T>> Select<T>(Expression<Func<T, bool>> expression, SearchParam? search, int skip = 0, int limit = 100, CancellationToken cancellationToken = default, int? batch = null) where T : DBModel =>
         Select<T>(ExpressionTranslator.Translate(expression, search), skip, limit, cancellationToken, batch);
@@ -118,7 +132,10 @@ public sealed class DataRepository(
                 foreach (var chunk in group.Chunk(batchSize))
                 {
                     IReadOnlyList<T> list = chunk;
-                    if (group.Key == DataState.New) await provider.Insert(list, current, cancellationToken);
+                    if (group.Key == DataState.New)
+                    {
+                        await provider.Insert(list, current, cancellationToken);
+                    }
                     else if (group.Key == DataState.Changed) await provider.Update(list, current, cancellationToken);
                     else await provider.Delete(list, modelMetadata.HardDelete, current, cancellationToken);
                     if (group.Key is DataState.New or DataState.Changed) await extensions.Save(list, current, cancellationToken);
