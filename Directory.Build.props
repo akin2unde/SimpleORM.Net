@@ -19,4 +19,19 @@
   <ItemGroup Condition="'$(IsPackable)' == 'true'">
     <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
+  <PackageProjectUrl>
+  https://github.com/akin2unde/SimpleORM.Net
+</PackageProjectUrl>
+
+<PackageRequireLicenseAcceptance>
+  false
+</PackageRequireLicenseAcceptance>
+
+<IncludeSymbols>
+  true
+</IncludeSymbols>
+
+<SymbolPackageFormat>
+  snupkg
+</SymbolPackageFormat>
 </Project>
