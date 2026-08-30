@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><IsPackable>true</IsPackable><PackageId>SimpleORM.Net.SqlServer</PackageId><Version>0.1.0</Version><Description>SQL Server provider for SimpleORM.Net.</Description></PropertyGroup>
+  <PropertyGroup><IsPackable>true</IsPackable>
+  <PackageId>SimpleORM.Net.SqlServer</PackageId>
+  <Description>SQL Server provider for SimpleORM.Net.</Description>
+  </PropertyGroup>
   <ItemGroup><ProjectReference Include="../SimpleORM.Net/SimpleORM.Net.csproj"/><PackageReference Include="Microsoft.Data.SqlClient"/></ItemGroup>
 </Project>
