@@ -1,4 +1,8 @@
 # SimpleORM.Net
+[![Build](https://github.com/akin2unde/SimpleORM.Net/actions/workflows/build.yml/badge.svg)](https://github.com/akin2unde/SimpleORM.Net/actions/workflows/build.yml)
+[![NuGet](https://img.shields.io/nuget/v/SimpleORM.Net.svg)](https://www.nuget.org/packages/SimpleORM.Net)
+[![Downloads](https://img.shields.io/nuget/dt/SimpleORM.Net.svg)](https://www.nuget.org/packages/SimpleORM.Net)
+[![License](https://img.shields.io/github/license/akin2unde/SimpleORM.Net)](LICENSE)
 
 A lightweight, provider-based ORM for .NET 10 focused on a small repository API, model conventions, batching, transactions, extensions, multi-tenancy, auditing and provider-specific schema management.
 
@@ -12,6 +16,7 @@ A lightweight, provider-based ORM for .NET 10 focused on a small repository API,
 - `SimpleORM.Net.MongoDB` — MongoDB provider and index synchronization.
 - `SimpleORM.Net.AspNetCore` — ASP.NET Core tenant/user integration, error middleware and payload encryption.
 - `SimpleORM.Net.Http` — typed HTTP request wrapper.
+
 
 ## Quick start
 
