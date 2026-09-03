@@ -46,7 +46,7 @@ internal static class ExpressionTranslator
             {
                 Field=m.Member.Name,Operator=c.NodeType switch
                 {
-                    ExpressionType.Equal=>SearchOperator.Equal,ExpressionType.NotEqual=>SearchOperator.NotEqual,ExpressionType.GreaterThan=>SearchOperator.GreaterThan,ExpressionType.GreaterThanOrEqual=>SearchOperator.GreaterThanOrEqual,ExpressionType.LessThan=>SearchOperator.LessThan,ExpressionType.LessThanOrEqual=>SearchOperator.LessThanOrEqual,_=>throw new NotSupportedException()
+                    ExpressionType.Equal=>SearchOperator.EQ,ExpressionType.NotEqual=>SearchOperator.NEQ,ExpressionType.GreaterThan=>SearchOperator.GT,ExpressionType.GreaterThanOrEqual=>SearchOperator.GTE,ExpressionType.LessThan=>SearchOperator.LT,ExpressionType.LessThanOrEqual=>SearchOperator.LTE,_=>throw new NotSupportedException()
                 }
                 ,Value=Expression.Lambda(c.Right).Compile().DynamicInvoke()
             }

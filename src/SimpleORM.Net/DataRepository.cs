@@ -68,6 +68,82 @@ public sealed class DataRepository(
         Select<T>(ExpressionTranslator.Translate(expression, search), skip, limit, cancellationToken, batch);
 
     /// <inheritdoc />
+    public async Task<PagedResult<dynamic>> SelectDynamic<T>(
+        SearchParam search,
+        int skip = 0,
+        int limit = 100,
+        CancellationToken cancellationToken = default,
+        int? batch = null)
+        where T : DBModel
+    {
+        ArgumentNullException.ThrowIfNull(search);
+
+        if (skip < 0 || limit < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                skip < 0 ? nameof(skip) : nameof(limit));
+        }
+
+        var param = search.Clone();
+
+        if (param.Fields.Count == 0
+            && param.Joins.All(join => join.Fields.Count == 0))
+        {
+            throw new InvalidOperationException(
+                "SelectDynamic requires at least one selected field.");
+        }
+
+        var total = await provider.Count<T>(
+            param,
+            cancellationToken);
+
+        var available = Math.Max(0, total - skip);
+        var target = limit == 0
+            ? available
+            : Math.Min(limit, available);
+
+        var batchSize = BatchResolver.Resolve(
+            batch,
+            options.Batch.Select);
+
+        var data = new List<dynamic>();
+        var position = skip;
+        long remaining = target;
+
+        while (remaining > 0)
+        {
+            var take = (int)Math.Min(batchSize, remaining);
+            var chunk = await provider.SelectDynamic<T>(
+                param,
+                position,
+                take,
+                cancellationToken);
+
+            if (chunk.Count == 0)
+            {
+                break;
+            }
+
+            data.AddRange(chunk);
+            position += chunk.Count;
+            remaining -= chunk.Count;
+
+            if (chunk.Count < take)
+            {
+                break;
+            }
+        }
+
+        return new PagedResult<dynamic>
+        {
+            Data = data,
+            TotalRecords = total,
+            Skipped = skip,
+            Limit = limit
+        };
+    }
+
+    /// <inheritdoc />
     public async Task<T?> SelectSingle<T>(SearchParam? search = null, CancellationToken cancellationToken = default) where T : DBModel
     {
         var item = await provider.SelectSingle<T>(search?.Clone() ?? new SearchParam(), cancellationToken);
@@ -144,6 +220,7 @@ public sealed class DataRepository(
             }
         }, cancellationToken);
         foreach (var item in items) item.DataState = DataState.Unchanged;
+        ApplyDefaults(items);
         return items;
     }
 
@@ -153,12 +230,29 @@ public sealed class DataRepository(
     private void Prepare<T>(IEnumerable<T> items) where T : DBModel
     {
         var now = DateTime.UtcNow;
-        var tenant = options.MultiTenancy.Enabled ? tenantProvider.GetTenant() : null;
-        if (options.MultiTenancy.Enabled && string.IsNullOrWhiteSpace(tenant)) throw new InvalidOperationException("Tenant required.");
         var modelMetadata = metadata.GetMetadata<T>();
+        var tenantRequired = options.MultiTenancy.Enabled
+            && modelMetadata.TenantScoped;
+        var tenant = tenantRequired
+            ? tenantProvider.GetTenant()
+            : null;
+
+        if (tenantRequired && string.IsNullOrWhiteSpace(tenant))
+        {
+            throw new InvalidOperationException(
+                $"Tenant is required for model '{modelMetadata.ModelName}'.");
+        }
+
         foreach (var item in items)
         {
-            if (options.MultiTenancy.Enabled) item.Tenant = tenant;
+            if (tenantRequired)
+            {
+                item.Tenant = tenant;
+            }
+            else if (!modelMetadata.TenantScoped)
+            {
+                item.Tenant = null;
+            }
             if (item.DataState == DataState.New)
             {
                 if (string.IsNullOrWhiteSpace(item.Code)) item.Code = item.GenerateCode(modelMetadata.CodeLength, options.CodeGeneration.Separator);
@@ -180,8 +274,21 @@ public sealed class DataRepository(
         foreach (var item in items)
         {
             item.DataState = DataState.Unchanged;
-            foreach (var column in modelMetadata.Columns.Where(x => x.DefaultOnReturn))
-                column.Property.SetValue(item, column.PropertyType.IsValueType ? Activator.CreateInstance(column.PropertyType) : null);
+
+            if (!modelMetadata.TenantScoped)
+            {
+                item.Tenant = null;
+            }
+
+            foreach (var column in modelMetadata.Columns.Where(
+                         column => column.DefaultOnReturn))
+            {
+                column.Property.SetValue(
+                    item,
+                    column.PropertyType.IsValueType
+                        ? Activator.CreateInstance(column.PropertyType)
+                        : null);
+            }
         }
     }
 }

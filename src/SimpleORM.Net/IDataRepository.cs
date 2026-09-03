@@ -88,6 +88,25 @@ public interface IDataRepository
         where T : DBModel;
 
     /// <summary>
+    /// Selects records as dynamic objects containing only the fields explicitly
+    /// requested through <see cref="SearchParam.Fields"/> and joined-field projections.
+    /// </summary>
+    /// <typeparam name="T">The DBModel type used to build the query.</typeparam>
+    /// <param name="search">Filters, joins, selected fields, and ordering.</param>
+    /// <param name="skip">The number of matching records to skip.</param>
+    /// <param name="limit">The maximum number of records to return. Zero means all matching records.</param>
+    /// <param name="cancellationToken">Token used to cancel the asynchronous operation.</param>
+    /// <param name="batch">Optional batch size.</param>
+    /// <returns>A paged result of dynamic objects containing only selected fields.</returns>
+    Task<PagedResult<dynamic>> SelectDynamic<T>(
+        SearchParam search,
+        int skip = 0,
+        int limit = 100,
+        CancellationToken cancellationToken = default,
+        int? batch = null)
+        where T : DBModel;
+
+    /// <summary>
     /// Selects the first record matching an optional <see cref="SearchParam"/>.
     /// </summary>
     /// <typeparam name="T">The DBModel type to select.</typeparam>

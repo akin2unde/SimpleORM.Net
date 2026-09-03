@@ -405,7 +405,7 @@ public sealed class SampleExtensionService : IExtensionService
                         DBExtensionDefinition.ModelName),
 
                 Operator =
-                    SearchOperator.Equal,
+                    SearchOperator.EQ,
 
                 Value =
                     typeof(T).Name
@@ -429,7 +429,7 @@ public sealed class SampleExtensionService : IExtensionService
                             DBExtensionDefinition.Published),
 
                     Operator =
-                        SearchOperator.Equal,
+                        SearchOperator.EQ,
 
                     Value = true
                 });
@@ -467,7 +467,7 @@ public sealed class SampleExtensionService : IExtensionService
                         DBExtensionRecordValue.ModelName),
 
                 Operator =
-                    SearchOperator.Equal,
+                    SearchOperator.EQ,
 
                 Value =
                     typeof(T).Name

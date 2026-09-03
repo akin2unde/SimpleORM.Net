@@ -1,21 +1,24 @@
+using System.Text.Json.Serialization;
+
 namespace SimpleORM.Net.Query;
 
 /// <summary>Provider-neutral filter operators.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum SearchOperator
 {
 
     /// <summary>Equal.</summary>
-    Equal,
+    EQ,
     /// <summary>Not equal.</summary>
-    NotEqual,
+    NEQ,
     /// <summary>Greater than.</summary>
-    GreaterThan,
+    GT,
     /// <summary>Greater/equal.</summary>
-    GreaterThanOrEqual,
+    GTE,
     /// <summary>Less than.</summary>
-    LessThan,
+    LT,
     /// <summary>Less/equal.</summary>
-    LessThanOrEqual,
+    LTE,
     /// <summary>Contains.</summary>
     Contains,
     /// <summary>Starts with.</summary>

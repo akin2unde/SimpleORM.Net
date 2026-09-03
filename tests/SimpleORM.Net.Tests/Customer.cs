@@ -26,4 +26,7 @@ internal sealed class Customer : DBModel
     }
     = string.Empty;
 
+    [Ignore]
+    public string? TemporaryValue { get; set; }
+
 }

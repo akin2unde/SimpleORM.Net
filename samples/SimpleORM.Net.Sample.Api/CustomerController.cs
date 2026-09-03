@@ -42,6 +42,23 @@ public sealed class CustomerController : ControllerBase
             batch);
     }
 
+    /// <summary>Returns only the customer fields selected in the request.</summary>
+    [HttpPost("SelectDynamic")]
+    public Task<PagedResult<dynamic>> SelectDynamic(
+        [FromBody] SearchParam search,
+        [FromQuery] int skip = 0,
+        [FromQuery] int limit = 100,
+        CancellationToken cancellationToken = default,
+        [FromQuery] int? batch = null)
+    {
+        return _service.SelectDynamic(
+            search,
+            skip,
+            limit,
+            cancellationToken,
+            batch);
+    }
+
     /// <summary>
     /// Demonstrates the expression-based Select overload by returning active customers.
     /// </summary>

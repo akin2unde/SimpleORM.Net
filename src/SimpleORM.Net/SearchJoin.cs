@@ -54,10 +54,10 @@ public sealed class SearchJoin
     }
 
     /// <summary>Projected joined fields.</summary>
-    public IList<string> Fields
+    public List<string> Fields
     {
         get;
-
+        set;
     }
     =new List<string>();
 

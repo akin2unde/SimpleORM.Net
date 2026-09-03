@@ -65,7 +65,17 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
     }
 
     /// <inheritdoc />
-    public async Task<T?> SelectSingle<T>(SearchParam p, CancellationToken ct = default) where T : DBModel => await Col<T>().Find(Filter<T>(p)).Sort(Sort<T>(p)).Limit(1).FirstOrDefaultAsync(ct);
+    public async Task<T?> SelectSingle<T>(
+        SearchParam search,
+        CancellationToken cancellationToken = default)
+        where T : DBModel
+    {
+        return await Col<T>()
+            .Find(Filter<T>(search))
+            .Sort(Sort<T>(search))
+            .Limit(1)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
 
     /// <inheritdoc />
     public Task<T?> GetByCode<T>(string code, CancellationToken ct = default) where T : DBModel
@@ -75,7 +85,7 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
         p.Filters.Add(new SearchFilter
         {
             Field = nameof(DBModel.Code),
-            Operator = SearchOperator.Equal,
+            Operator = SearchOperator.EQ,
             Value = code
         }
         );
@@ -85,7 +95,124 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<T>> Select<T>(SearchParam p, int skip, int limit, CancellationToken ct = default) where T : DBModel => await Col<T>().Find(Filter<T>(p)).Sort(Sort<T>(p)).Skip(skip).Limit(limit).ToListAsync(ct);
+    public async Task<IReadOnlyList<T>> Select<T>(
+        SearchParam search,
+        int skip,
+        int limit,
+        CancellationToken cancellationToken = default)
+        where T : DBModel
+    {
+        if (skip < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(skip));
+        }
+
+        if (limit < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(limit));
+        }
+
+        var query = Col<T>()
+            .Find(Filter<T>(search))
+            .Sort(Sort<T>(search))
+            .Skip(skip);
+
+        if (limit > 0)
+        {
+            query = query.Limit(limit);
+        }
+
+        return await query.ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<dynamic>> SelectDynamic<T>(
+        SearchParam search,
+        int skip,
+        int limit,
+        CancellationToken cancellationToken = default)
+        where T : DBModel
+    {
+        ArgumentNullException.ThrowIfNull(search);
+
+        if (skip < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(skip));
+        }
+
+        if (limit < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(limit));
+        }
+
+        if (search.Joins.Count > 0)
+        {
+            throw new NotSupportedException(
+                "MongoDB dynamic selection does not support joins.");
+        }
+
+        var metadata = _m.GetMetadata<T>();
+        var selectedColumns = search.Fields
+            .Select(field => metadata.PersistedColumns.FirstOrDefault(
+                column => column.PropertyName.Equals(
+                    field,
+                    StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException(
+                    $"Property '{field}' is not a persisted field on model '{metadata.ModelName}'."))
+            .DistinctBy(
+                column => column.PropertyName,
+                StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (selectedColumns.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "SelectDynamic requires at least one selected field.");
+        }
+
+        var projectionParts = selectedColumns
+            .Select(column => Builders<T>.Projection.Include(column.ColumnName))
+            .ToList();
+
+        projectionParts.Add(
+            Builders<T>.Projection.Exclude("_id"));
+
+        var query = Col<T>()
+            .Find(Filter<T>(search))
+            .Sort(Sort<T>(search))
+            .Skip(skip);
+
+        if (limit > 0)
+        {
+            query = query.Limit(limit);
+        }
+
+        var documents = await query
+            .Project<BsonDocument>(
+                Builders<T>.Projection.Combine(projectionParts))
+            .ToListAsync(cancellationToken);
+
+        var rows = new List<dynamic>(documents.Count);
+
+        foreach (var document in documents)
+        {
+            IDictionary<string, object?> row = new ExpandoObject();
+
+            foreach (var column in selectedColumns)
+            {
+                row[column.PropertyName] = document.TryGetValue(
+                    column.ColumnName,
+                    out var value)
+                    && !value.IsBsonNull
+                        ? BsonTypeMapper.MapToDotNetValue(value)
+                        : null;
+            }
+
+            rows.Add(row);
+        }
+
+        return rows;
+    }
 
     /// <inheritdoc />
     public Task<long> Count<T>(SearchParam p, CancellationToken ct = default) where T : DBModel => Col<T>().CountDocumentsAsync(Filter<T>(p), cancellationToken: ct);
@@ -179,6 +306,31 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
     }
 
     /// <inheritdoc />
+    public async Task<long> DeleteStale(
+        DBModelMetadata metadata,
+        DateTime olderThanUtc,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(metadata);
+
+        var createdAtColumn = metadata.PersistedColumns.FirstOrDefault(
+            column => column.PropertyName == nameof(DBModel.CreatedAt))
+            ?? throw new InvalidOperationException(
+                $"Model '{metadata.ModelName}' does not persist CreatedAt and cannot use stale-data cleanup.");
+
+        var collection = _db.GetCollection<BsonDocument>(
+            metadata.TableName);
+        var filter = Builders<BsonDocument>.Filter.Lt(
+            createdAtColumn.ColumnName,
+            olderThanUtc);
+        var result = await collection.DeleteManyAsync(
+            filter,
+            cancellationToken);
+
+        return result.DeletedCount;
+    }
+
+    /// <inheritdoc />
     public string GenerateDebugQuery<T>(SearchParam p, int skip = 0, int limit = 100) where T : DBModel => JsonSerializer.Serialize(new
     {
         collection = _m.GetMetadata<T>().TableName,
@@ -260,7 +412,8 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
                 codeColumn.ColumnName,
                 model.Code));
 
-        if (_o.MultiTenancy.Enabled)
+        if (_o.MultiTenancy.Enabled
+            && metadata.TenantScoped)
         {
             var tenant = _t.GetTenant()
                 ?? throw new InvalidOperationException(
@@ -328,12 +481,17 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
 
         foreach (var x in p.Filters)
         {
-            var c = m.Columns.First(z => z.PropertyName.Equals(x.Field, StringComparison.OrdinalIgnoreCase));
+            var c = m.PersistedColumns.FirstOrDefault(
+                column => column.PropertyName.Equals(
+                    x.Field,
+                    StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException(
+                    $"Property '{x.Field}' is not a persisted column on model '{m.ModelName}'.");
 
             fs.Add(x.Operator switch
             {
-                SearchOperator.Equal => b.Eq(c.ColumnName, x.Value),
-                SearchOperator.NotEqual => b.Ne(c.ColumnName, x.Value),
+                SearchOperator.EQ => b.Eq(c.ColumnName, x.Value),
+                SearchOperator.NEQ => b.Ne(c.ColumnName, x.Value),
                 SearchOperator.Contains => b.Regex(c.ColumnName, new BsonRegularExpression(System.Text.RegularExpressions.Regex.Escape(x.Value?.ToString() ?? ""), "i")),
                 SearchOperator.In => b.In(c.ColumnName, ((System.Collections.IEnumerable)x.Value!).Cast<object?>()),
                 _ => throw new NotSupportedException($"Operator {x.Operator} not implemented in Mongo MVP.")
@@ -353,7 +511,21 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
         return Scoped<T>(basef, p.IncludeDeleted);
 
     }
-
+    private string? GetTenantValueFromFilter<T>(FilterDefinition<T> filter) where T : DBModel
+    {
+        if (_o.MultiTenancy.Enabled)
+        {
+            var renderArgs = new RenderArgs<T>(BsonSerializer.SerializerRegistry.GetSerializer<T>(), BsonSerializer.SerializerRegistry);
+            BsonDocument renderedDoc = filter.Render(renderArgs);
+            if (renderedDoc.Elements.Any(_ => _.Name == _o.MultiTenancy.JwtClaim))
+            {
+                var value = renderedDoc.Elements.First(_ => _.Name == _o.MultiTenancy.JwtClaim).Value;
+                if (value is null) return null;
+                return value.AsString;
+            }
+        }
+        return null;
+    }
     private FilterDefinition<T> Scoped<T>(FilterDefinition<T> f, bool includeDeleted) where T : DBModel
     {
         var b = Builders<T>.Filter;
@@ -364,9 +536,23 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
         }
         ;
 
-        if (_o.MultiTenancy.Enabled) all.Add(b.Eq(x => x.Tenant, _t.GetTenant() ?? throw new InvalidOperationException("Tenant required.")));
+        var metadata = _m.GetMetadata<T>();
 
-        if (!_m.GetMetadata<T>().HardDelete && !includeDeleted) all.Add(b.Eq(x => x.DeletedAt, null));
+        if (_o.MultiTenancy.Enabled
+            && metadata.TenantScoped)
+        {
+            all.Add(
+                b.Eq(
+                    x => x.Tenant,
+                    _t.GetTenant() ?? GetTenantValueFromFilter<T>(f)
+                    ?? throw new InvalidOperationException(
+                        $"Tenant is required for model '{metadata.ModelName}'.")));
+        }
+
+        if (!metadata.HardDelete && !includeDeleted)
+        {
+            all.Add(b.Eq(x => x.DeletedAt, null));
+        }
 
         return b.And(all);
 
@@ -378,7 +564,21 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
 
         var m = _m.GetMetadata<T>();
 
-        var x = p.OrderBy.Select(o => o.Descending ? b.Descending(m.Columns.First(c => c.PropertyName == o.Field).ColumnName) : b.Ascending(m.Columns.First(c => c.PropertyName == o.Field).ColumnName)).ToList();
+        var x = p.OrderBy
+            .Select(order =>
+            {
+                var column = m.PersistedColumns.FirstOrDefault(
+                    item => item.PropertyName.Equals(
+                        order.Field,
+                        StringComparison.OrdinalIgnoreCase))
+                    ?? throw new InvalidOperationException(
+                        $"Property '{order.Field}' is not a persisted column on model '{m.ModelName}'.");
+
+                return order.Descending
+                    ? b.Descending(column.ColumnName)
+                    : b.Ascending(column.ColumnName);
+            })
+            .ToList();
 
         x.Add(b.Ascending(nameof(DBModel.Code)));
 

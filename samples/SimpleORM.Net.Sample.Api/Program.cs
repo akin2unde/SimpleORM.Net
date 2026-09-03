@@ -123,6 +123,17 @@ public static class Program
         options.ErrorLog.Enabled = configuration.GetValue(
             "SimpleOrm:ErrorLog:Enabled",
             false);
+
+        options.ErrorLog.AutoDeleteEnabled = configuration.GetValue(
+            "SimpleOrm:ErrorLog:AutoDeleteEnabled",
+            false);
+
+        options.ErrorLog.RetentionDays = configuration.GetValue(
+            "SimpleOrm:ErrorLog:RetentionDays",
+            60);
+
+        options.ErrorLog.CleanupCron = configuration[
+            "SimpleOrm:ErrorLog:CleanupCron"] ?? "0 0 1 * *";
     }
 
     private static int ResolvePort(

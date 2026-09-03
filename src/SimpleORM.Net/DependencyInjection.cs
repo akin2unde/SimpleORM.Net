@@ -1,6 +1,8 @@
+using Cronos;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using SimpleORM.Net.Abstractions;
+using SimpleORM.Net.Attributes;
 using SimpleORM.Net.Configuration;
 using SimpleORM.Net.Metadata;
 using SimpleORM.Net.Services;
@@ -40,6 +42,19 @@ public static class DependencyInjection
             throw new InvalidOperationException("Code length must be at least 4.");
         }
 
+        if (options.ErrorLog.AutoDeleteEnabled)
+        {
+            if (options.ErrorLog.RetentionDays <= 0)
+            {
+                throw new InvalidOperationException(
+                    "ErrorLog.RetentionDays must be greater than zero when auto delete is enabled.");
+            }
+
+            _ = CronExpression.Parse(
+                options.ErrorLog.CleanupCron,
+                CronFormat.Standard);
+        }
+
         services.AddSingleton(options);
         services.AddSingleton<IDBMetadataProvider, DBMetadataProvider>();
         services.AddSingleton<ICodeGenerator, CodeGenerator>();
@@ -47,11 +62,31 @@ public static class DependencyInjection
         services.AddScoped<IExtensionService, DefaultExtensionService>();
         services.AddScoped<IAuditService, DefaultAuditService>();
         services.AddScoped<IDataRepository, DataRepository>();
+
+        var assemblies = modelAssemblies.Length == 0
+            ? AppDomain.CurrentDomain.GetAssemblies().ToList()
+            : modelAssemblies.ToList();
+
+        var simpleOrmAssembly = typeof(DependencyInjection).Assembly;
+
+        if (!assemblies.Contains(simpleOrmAssembly))
+        {
+            assemblies.Add(simpleOrmAssembly);
+        }
+
+        var hasModelCleanup = ModelDiscovery
+            .Discover(assemblies)
+            .Any(type => type.IsDefined(
+                typeof(AutoDeleteAttribute),
+                inherit: true));
+
+        if (options.ErrorLog.AutoDeleteEnabled || hasModelCleanup)
+        {
+            services.AddHostedService<StaleDataCleanupHostedService>();
+        }
+
         services.AddSingleton(
-            new ModelAssemblyRegistry(
-                modelAssemblies.Length == 0
-                    ? AppDomain.CurrentDomain.GetAssemblies()
-                    : modelAssemblies));
+            new ModelAssemblyRegistry(assemblies));
 
         return services;
     }

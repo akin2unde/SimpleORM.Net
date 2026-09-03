@@ -148,6 +148,23 @@ public CustomerService(
 
 The repository is not tied to one model type. Specify the model on each call, for example `Select<Customer>()`, `Save<Inventory>()`, or `GetByCode<DBExtensionDefinition>()`.
 
+To return only selected fields as dynamic objects, post a `SearchParam` to `POST /customer/SelectDynamic`:
+
+```json
+{
+  "fields": ["Code", "Name", "Email"],
+  "filters": [
+    {
+      "field": "Status",
+      "operator": "EQ",
+      "value": "Active"
+    }
+  ]
+}
+```
+
+The response retains the normal paging metadata, but each item in `data` contains only `Code`, `Name`, and `Email`. Comparison operators are `EQ`, `NEQ`, `GT`, `GTE`, `LT`, and `LTE`.
+
 This keeps HTTP concerns out of the data layer and keeps ORM-specific calls out of controllers.
 
 ## 5. IDataRepository methods demonstrated by CustomerService
@@ -160,7 +177,7 @@ search.Filters.Add(
     new SearchFilter
     {
         Field = nameof(Customer.Status),
-        Operator = SearchOperator.Equal,
+        Operator = SearchOperator.EQ,
         Value = CustomerStatus.Active
     });
 
@@ -193,7 +210,7 @@ search.Filters.Add(
     new SearchFilter
     {
         Field = nameof(Customer.Email),
-        Operator = SearchOperator.Equal,
+        Operator = SearchOperator.EQ,
         Value = "user@example.com"
     });
 
@@ -564,3 +581,54 @@ return await _transactionManager.Execute(
 ```
 
 The transaction manager owns begin/commit/rollback. Repository operations inside the callback reuse the active scoped transaction, so if the inventory save fails the customer save is rolled back as part of the same logical operation.
+
+## Global models and ignored properties
+
+When multi-tenancy is enabled, normal `DBModel` types are tenant scoped. Use `[Global]` for shared reference data that should not require or persist a tenant:
+
+```csharp
+[Global]
+public sealed class Country : DBModel
+{
+    public string Name { get; set; } = string.Empty;
+
+    [Ignore]
+    public string? DisplayLabel { get; set; }
+}
+```
+
+`DisplayLabel` is runtime-only and is excluded from SQL Server and MongoDB persistence. `Country` is available to every tenant and the inherited `Tenant` property is not persisted.
+
+## Fetch all with `limit: 0`
+
+```csharp
+var countries = await repository.Select<Country>(
+    limit: 0,
+    cancellationToken: cancellationToken);
+```
+
+`limit: 0` means all matching records. The repository still reads internally in configured batches so provider operations remain bounded.
+
+## Automatic stale-data cleanup
+
+The sample `appsettings.json` includes optional error-log retention settings. For example, to retain 60 days of error logs and clean them every quarter:
+
+```json
+"ErrorLog": {
+  "Enabled": true,
+  "AutoDeleteEnabled": true,
+  "RetentionDays": 60,
+  "CleanupCron": "0 0 1 */3 *"
+}
+```
+
+The cron is evaluated in UTC. At each run SimpleORM physically deletes error-log records whose `CreatedAt` is older than 60 days.
+
+Custom models can opt in directly:
+
+```csharp
+[AutoDelete(60, "0 0 1 * *")]
+public sealed class TemporaryImport : DBModel
+{
+}
+```

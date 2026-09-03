@@ -22,6 +22,16 @@ public interface ICustomerService
         int? batch = null);
 
     /// <summary>
+    /// Demonstrates IDataRepository.SelectDynamic using fields supplied in a SearchParam.
+    /// </summary>
+    Task<PagedResult<dynamic>> SelectDynamic(
+        SearchParam search,
+        int skip = 0,
+        int limit = 100,
+        CancellationToken cancellationToken = default,
+        int? batch = null);
+
+    /// <summary>
     /// Demonstrates IDataRepository.Select(expression,...).
     /// </summary>
     Task<PagedResult<Customer>> SelectActive(

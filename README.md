@@ -203,6 +203,22 @@ Apply `[Extendable]` to models that support dynamic extension definitions. `DBMo
 
 The sample API contains end-to-end definition, publishing, loading and saving examples.
 
+## Ignored properties
+
+Use `[Ignore]` for model properties that belong to runtime/application state but must never be persisted:
+
+```csharp
+public sealed class Country : DBModel
+{
+    public string Name { get; set; } = string.Empty;
+
+    [Ignore]
+    public string? DisplayLabel { get; set; }
+}
+```
+
+Ignored properties are excluded from SQL Server schema generation, selects, inserts, updates, filters, joins, and ordering. MongoDB also omits ignored members from BSON persistence. Existing ignored SQL columns are only physically removed when destructive migrations are enabled.
+
 ## Multi-tenancy
 
 Enable tenant filtering globally:
@@ -214,9 +230,42 @@ options.MultiTenancy.JwtClaim = "tenant";
 
 ASP.NET Core can resolve the tenant from the configured JWT claim. Tenant behavior remains optional.
 
+Use `[Global]` for shared models that must not require or persist a tenant even when application multi-tenancy is enabled:
+
+```csharp
+[Global]
+public sealed class Country : DBModel
+{
+    public string Name { get; set; } = string.Empty;
+}
+```
+
+Normal models remain tenant scoped. Global models skip tenant filters on read/update/delete and the inherited `Tenant` property is excluded from persistence. Typical uses include tenant records themselves and shared reference data such as countries.
+
 ## Audit and error logging
 
 Audit trails are opt-in globally and can be disabled per model. Error logging middleware is also optional and can persist useful failure context such as request URL and payload information where available.
+
+Stale error logs can be physically removed on a UTC cron schedule:
+
+```csharp
+options.ErrorLog.Enabled = true;
+options.ErrorLog.AutoDeleteEnabled = true;
+options.ErrorLog.RetentionDays = 60;
+options.ErrorLog.CleanupCron = "0 0 1 */3 *"; // every quarter
+```
+
+The cleanup above runs every three months and deletes error-log records whose `CreatedAt` is older than 60 days. A monthly schedule can use `0 0 1 * *`. Cleanup bypasses tenant scoping because retention is system-level maintenance.
+
+Any model can opt into the same retention mechanism:
+
+```csharp
+[AutoDelete(60, "0 0 1 * *")]
+public sealed class TemporaryImport : DBModel
+{
+}
+```
+
 
 ## Enum and string conventions
 

@@ -96,7 +96,7 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
             new SearchFilter
             {
                 Field = nameof(DBModel.Code),
-                Operator = SearchOperator.Equal,
+                Operator = SearchOperator.EQ,
                 Value = code
             });
 
@@ -122,11 +122,11 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
                 "Skip cannot be negative.");
         }
 
-        if (limit <= 0)
+        if (limit < 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(limit),
-                "The provider receives physical batches, so limit must be greater than zero.");
+                "Limit cannot be negative.");
         }
 
         var query = BuildSelectQuery<T>(
@@ -136,6 +136,38 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
             single: false);
 
         return ReadModels<T>(
+            query,
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<dynamic>> SelectDynamic<T>(
+        SearchParam search,
+        int skip,
+        int limit,
+        CancellationToken cancellationToken = default)
+        where T : DBModel
+    {
+        ArgumentNullException.ThrowIfNull(search);
+
+        if (skip < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(skip));
+        }
+
+        if (limit < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(limit));
+        }
+
+        var query = BuildSelectQuery<T>(
+            search,
+            skip,
+            limit,
+            single: false,
+            dynamicProjection: true);
+
+        return ReadDynamic(
             query,
             cancellationToken);
     }
@@ -434,6 +466,37 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
     }
 
     /// <inheritdoc />
+    public async Task<long> DeleteStale(
+        DBModelMetadata metadata,
+        DateTime olderThanUtc,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(metadata);
+
+        var createdAtColumn = metadata.PersistedColumns.FirstOrDefault(
+            column => column.PropertyName == nameof(DBModel.CreatedAt))
+            ?? throw new InvalidOperationException(
+                $"Model '{metadata.ModelName}' does not persist CreatedAt and cannot use stale-data cleanup.");
+
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"""
+                              DELETE FROM [{EscapeIdentifier(metadata.TableName)}]
+                              WHERE [{EscapeIdentifier(createdAtColumn.ColumnName)}] < @cutoffUtc;
+                              """;
+        command.Parameters.AddWithValue(
+            "@cutoffUtc",
+            olderThanUtc);
+
+        var affected = await command.ExecuteNonQueryAsync(
+            cancellationToken);
+
+        return affected;
+    }
+
+    /// <inheritdoc />
     public string GenerateDebugQuery<T>(
         SearchParam search,
         int skip = 0,
@@ -449,9 +512,11 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
                 "Skip cannot be negative.");
         }
 
-        if (limit <= 0)
+        if (limit < 0)
         {
-            limit = 1;
+            throw new ArgumentOutOfRangeException(
+                nameof(limit),
+                "Limit cannot be negative.");
         }
 
         var query = BuildSelectQuery<T>(
@@ -629,7 +694,8 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
         SearchParam search,
         int skip,
         int limit,
-        bool single)
+        bool single,
+        bool dynamicProjection = false)
         where T : DBModel
     {
         var metadata = _metadata.GetMetadata<T>();
@@ -637,7 +703,8 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
 
         var select = BuildSelectList(
             metadata,
-            search);
+            search,
+            dynamicProjection);
 
         var joins = BuildFromClause(
             metadata,
@@ -654,7 +721,9 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
 
         var pagination = single
             ? string.Empty
-            : $"OFFSET {skip} ROWS FETCH NEXT {limit} ROWS ONLY";
+            : limit == 0
+                ? $"OFFSET {skip} ROWS"
+                : $"OFFSET {skip} ROWS FETCH NEXT {limit} ROWS ONLY";
 
         var top = single
             ? "TOP (1) "
@@ -676,11 +745,16 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
 
     private string BuildSelectList(
         DBModelMetadata metadata,
-        SearchParam search)
+        SearchParam search,
+        bool dynamicProjection)
     {
+        ValidateSelectedFields(
+            metadata,
+            search.Fields);
+
         IEnumerable<DBColumnMetadata> mainColumns = metadata.PersistedColumns;
 
-        if (search.Fields.Count > 0)
+        if (dynamicProjection || search.Fields.Count > 0)
         {
             mainColumns = mainColumns.Where(
                 column => search.Fields.Contains(
@@ -691,7 +765,10 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
         var fields = mainColumns
             .Select(
                 column =>
-                    $"[t].[{EscapeIdentifier(column.ColumnName)}]")
+                    dynamicProjection
+                        ? $"[t].[{EscapeIdentifier(column.ColumnName)}] " +
+                          $"AS [{EscapeIdentifier(column.PropertyName)}]"
+                        : $"[t].[{EscapeIdentifier(column.ColumnName)}]")
             .ToList();
 
         for (var index = 0; index < search.Joins.Count; index++)
@@ -701,6 +778,10 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
             var alias = ResolveJoinAlias(
                 join,
                 index);
+
+            ValidateSelectedFields(
+                joinMetadata,
+                join.Fields);
 
             IEnumerable<DBColumnMetadata> joinedColumns = joinMetadata.PersistedColumns;
 
@@ -732,6 +813,59 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
         return string.Join(
             ", ",
             fields);
+    }
+
+    private static void ValidateSelectedFields(
+        DBModelMetadata metadata,
+        IEnumerable<string> fields)
+    {
+        foreach (var field in fields)
+        {
+            if (!metadata.PersistedColumns.Any(
+                    column => column.PropertyName.Equals(
+                        field,
+                        StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new InvalidOperationException(
+                    $"Property '{field}' is not a persisted field on model '{metadata.ModelName}'.");
+            }
+        }
+    }
+
+    private async Task<IReadOnlyList<dynamic>> ReadDynamic(
+        (string Sql, IReadOnlyDictionary<string, object?> Parameters) query,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = query.Sql;
+
+        AddParameters(
+            command,
+            query.Parameters);
+
+        await using var reader = await command.ExecuteReaderAsync(
+            cancellationToken);
+
+        var rows = new List<dynamic>();
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            IDictionary<string, object?> row = new ExpandoObject();
+
+            for (var index = 0; index < reader.FieldCount; index++)
+            {
+                row[reader.GetName(index)] = reader.IsDBNull(index)
+                    ? null
+                    : reader.GetValue(index);
+            }
+
+            rows.Add(row);
+        }
+
+        return rows;
     }
 
     private string BuildFromClause(
@@ -831,7 +965,8 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
 
         var requiredConditions = new List<string>();
 
-        if (_options.MultiTenancy.Enabled)
+        if (_options.MultiTenancy.Enabled
+            && metadata.TenantScoped)
         {
             var tenantColumn = metadata.TenantColumn
                 ?? throw new InvalidOperationException(
@@ -896,22 +1031,22 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
 
         return filter.Operator switch
         {
-            SearchOperator.Equal =>
+            SearchOperator.EQ =>
                 $"{name} = {AddParameter(parameters, ToDatabaseValue(column, filter.Value))}",
 
-            SearchOperator.NotEqual =>
+            SearchOperator.NEQ =>
                 $"{name} <> {AddParameter(parameters, ToDatabaseValue(column, filter.Value))}",
 
-            SearchOperator.GreaterThan =>
+            SearchOperator.GT =>
                 $"{name} > {AddParameter(parameters, ToDatabaseValue(column, filter.Value))}",
 
-            SearchOperator.GreaterThanOrEqual =>
+            SearchOperator.GTE =>
                 $"{name} >= {AddParameter(parameters, ToDatabaseValue(column, filter.Value))}",
 
-            SearchOperator.LessThan =>
+            SearchOperator.LT =>
                 $"{name} < {AddParameter(parameters, ToDatabaseValue(column, filter.Value))}",
 
-            SearchOperator.LessThanOrEqual =>
+            SearchOperator.LTE =>
                 $"{name} <= {AddParameter(parameters, ToDatabaseValue(column, filter.Value))}",
 
             SearchOperator.Contains =>
@@ -1329,7 +1464,8 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
         Dictionary<string, object?> parameters,
         ICollection<string> whereParts)
     {
-        if (!_options.MultiTenancy.Enabled)
+        if (!_options.MultiTenancy.Enabled
+            || !metadata.TenantScoped)
         {
             return;
         }
@@ -1358,14 +1494,14 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
         DBModelMetadata metadata,
         string propertyName)
     {
-        var column = metadata.Columns.FirstOrDefault(
+        var column = metadata.PersistedColumns.FirstOrDefault(
             candidate => candidate.PropertyName.Equals(
                 propertyName,
                 StringComparison.OrdinalIgnoreCase));
 
         return column
             ?? throw new InvalidOperationException(
-                $"Property '{propertyName}' was not found on model '{metadata.ModelName}'.");
+                $"Property '{propertyName}' is not a persisted column on model '{metadata.ModelName}'.");
     }
 
     private static DBColumnMetadata GetRequiredColumn(

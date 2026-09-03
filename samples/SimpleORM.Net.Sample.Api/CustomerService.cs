@@ -54,6 +54,22 @@ public sealed class CustomerService : ICustomerService
     }
 
     /// <inheritdoc />
+    public Task<PagedResult<dynamic>> SelectDynamic(
+        SearchParam search,
+        int skip = 0,
+        int limit = 100,
+        CancellationToken cancellationToken = default,
+        int? batch = null)
+    {
+        return _repository.SelectDynamic<Customer>(
+            search,
+            skip,
+            limit,
+            cancellationToken,
+            batch);
+    }
+
+    /// <inheritdoc />
     public Task<PagedResult<Customer>> SelectActive(
         int skip = 0,
         int limit = 100,
@@ -248,7 +264,7 @@ public sealed class CustomerService : ICustomerService
             new SearchFilter
             {
                 Field = nameof(DBExtensionDefinition.ModelName),
-                Operator = SearchOperator.Equal,
+                Operator = SearchOperator.EQ,
                 Value = nameof(Customer)
             });
 
@@ -258,7 +274,7 @@ public sealed class CustomerService : ICustomerService
                 new SearchFilter
                 {
                     Field = nameof(DBExtensionDefinition.Published),
-                    Operator = SearchOperator.Equal,
+                    Operator = SearchOperator.EQ,
                     Value = true
                 });
         }

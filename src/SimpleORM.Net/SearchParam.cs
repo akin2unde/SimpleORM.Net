@@ -14,44 +14,44 @@ public sealed class SearchParam
     }
 
     /// <summary>Optional generic-search field restriction.</summary>
-    public IList<string> SearchFields
+    public List<string> SearchFields
     {
         get;
-
+        set;
     }
-    =new List<string>();
+    = new List<string>();
 
     /// <summary>Filters.</summary>
-    public IList<SearchFilter> Filters
+    public List<SearchFilter> Filters
     {
         get;
-
+        set;
     }
-    =new List<SearchFilter>();
+    = new List<SearchFilter>();
 
     /// <summary>Joins.</summary>
-    public IList<SearchJoin> Joins
+    public List<SearchJoin> Joins
     {
         get;
-
+        set;
     }
-    =new List<SearchJoin>();
+    = new List<SearchJoin>();
 
     /// <summary>Main-model projected fields; empty means all persisted.</summary>
-    public IList<string> Fields
+    public List<string> Fields
     {
         get;
-
+        set;
     }
-    =new List<string>();
+    = new List<string>();
 
     /// <summary>Ordering.</summary>
-    public IList<SearchOrder> OrderBy
+    public List<SearchOrder> OrderBy
     {
         get;
-
+        set;
     }
-    =new List<SearchOrder>();
+    = new List<SearchOrder>();
 
     /// <summary>User filter combination.</summary>
     public SearchCondition Condition
@@ -61,7 +61,7 @@ public sealed class SearchParam
         set;
 
     }
-    =SearchCondition.And;
+    = SearchCondition.And;
 
     /// <summary>Include soft-deleted rows.</summary>
     public bool IncludeDeleted
@@ -75,37 +75,46 @@ public sealed class SearchParam
     /// <summary>Copies the request.</summary>
     public SearchParam Clone()
     {
-        var x=new SearchParam
+        var x = new SearchParam
         {
-            Search=Search,Condition=Condition,IncludeDeleted=IncludeDeleted
+            Search = Search,
+            Condition = Condition,
+            IncludeDeleted = IncludeDeleted
         }
         ;
 
-        foreach(var v in SearchFields)x.SearchFields.Add(v);
+        foreach (var v in SearchFields) x.SearchFields.Add(v);
 
-        foreach(var v in Fields)x.Fields.Add(v);
+        foreach (var v in Fields) x.Fields.Add(v);
 
-        foreach(var f in Filters)x.Filters.Add(new SearchFilter
+        foreach (var f in Filters) x.Filters.Add(new SearchFilter
         {
-            Field=f.Field,Operator=f.Operator,Value=f.Value
+            Field = f.Field,
+            Operator = f.Operator,
+            Value = f.Value
         }
         );
 
-        foreach(var o in OrderBy)x.OrderBy.Add(new SearchOrder
+        foreach (var o in OrderBy) x.OrderBy.Add(new SearchOrder
         {
-            Field=o.Field,Descending=o.Descending
+            Field = o.Field,
+            Descending = o.Descending
         }
         );
 
-        foreach(var j in Joins)
+        foreach (var j in Joins)
         {
-            var n=new SearchJoin
+            var n = new SearchJoin
             {
-                Model=j.Model,LocalField=j.LocalField,ForeignField=j.ForeignField,Type=j.Type,Alias=j.Alias
+                Model = j.Model,
+                LocalField = j.LocalField,
+                ForeignField = j.ForeignField,
+                Type = j.Type,
+                Alias = j.Alias
             }
             ;
 
-            foreach(var f in j.Fields)n.Fields.Add(f);
+            foreach (var f in j.Fields) n.Fields.Add(f);
 
             x.Joins.Add(n);
 

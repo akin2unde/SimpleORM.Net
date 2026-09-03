@@ -1,32 +1,23 @@
+using Cronos;
 using System.Collections.Concurrent;
-
 using System.Reflection;
-
 using SimpleORM.Net.Attributes;
-
 using SimpleORM.Net.Configuration;
-
 using SimpleORM.Net.Models;
 
 namespace SimpleORM.Net.Metadata;
 
-/// <summary>
-/// Reflection-once application-lifetime metadata cache.
-/// </summary>
+/// <summary>Reflection-once application-lifetime metadata cache.</summary>
 public sealed class DBMetadataProvider : IDBMetadataProvider
 {
     private readonly SimpleOrmOptions _options;
-
     private readonly ConcurrentDictionary<Type, DBModelMetadata> _cache = new();
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="DBMetadataProvider"/> class.
-    /// </summary>
-    /// <param name="options">The SimpleORM options.</param>
+    /// <summary>Initializes the metadata provider.</summary>
+    /// <param name="options">SimpleORM configuration.</param>
     public DBMetadataProvider(SimpleOrmOptions options)
     {
         _options = options;
-
     }
 
     /// <inheritdoc />
@@ -34,7 +25,6 @@ public sealed class DBMetadataProvider : IDBMetadataProvider
         where T : DBModel
     {
         return GetMetadata(typeof(T));
-
     }
 
     /// <inheritdoc />
@@ -44,30 +34,44 @@ public sealed class DBMetadataProvider : IDBMetadataProvider
         {
             throw new InvalidOperationException(
                 $"{type.FullName} must be a concrete DBModel.");
-
         }
 
         return _cache.GetOrAdd(type, Build);
-
     }
 
     /// <inheritdoc />
     public void RegisterModel(Type type)
     {
         _ = GetMetadata(type);
-
     }
 
     /// <inheritdoc />
     public IReadOnlyCollection<DBModelMetadata> GetRegisteredModels()
     {
         return _cache.Values.ToArray();
-
     }
 
     private DBModelMetadata Build(Type type)
     {
         var codeAttribute = type.GetCustomAttribute<DBCodeAttribute>(true);
+        var autoDeleteAttribute = type.GetCustomAttribute<AutoDeleteAttribute>(true);
+        var tenantScoped = !type.IsDefined(typeof(GlobalAttribute), true);
+
+        if (autoDeleteAttribute is not null)
+        {
+            try
+            {
+                _ = CronExpression.Parse(
+                    autoDeleteAttribute.Cron,
+                    CronFormat.Standard);
+            }
+            catch (CronFormatException exception)
+            {
+                throw new InvalidOperationException(
+                    $"Auto-delete cron for model '{type.Name}' is invalid.",
+                    exception);
+            }
+        }
 
         var prefixLength = Math.Min(
             Math.Max(1, _options.CodeGeneration.PrefixLength),
@@ -85,13 +89,12 @@ public sealed class DBMetadataProvider : IDBMetadataProvider
         {
             throw new InvalidOperationException(
                 $"Code length for {type.Name} must be at least 4.");
-
         }
 
         var columns = type
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(property => property.CanRead && property.CanWrite)
-            .Select(BuildColumn)
+            .Select(property => BuildColumn(property, tenantScoped))
             .ToArray();
 
         return new DBModelMetadata
@@ -105,26 +108,32 @@ public sealed class DBMetadataProvider : IDBMetadataProvider
             HardDelete = type.IsDefined(typeof(HardDeleteAttribute), true),
             Extendable = type.IsDefined(typeof(ExtendableAttribute), true),
             AuditEnabled = !type.IsDefined(typeof(DisableAuditAttribute), true),
+            TenantScoped = tenantScoped,
+            AutoDeleteAfterDays = autoDeleteAttribute?.OlderThanDays,
+            AutoDeleteCron = autoDeleteAttribute?.Cron,
             Columns = columns,
             CodeColumn = columns.Single(
                 column => column.PropertyName == nameof(DBModel.Code)),
-            TenantColumn = columns.SingleOrDefault(
-                column => column.PropertyName == nameof(DBModel.Tenant))
+            TenantColumn = tenantScoped
+                ? columns.SingleOrDefault(
+                    column =>
+                        column.PropertyName == nameof(DBModel.Tenant)
+                        && !column.Ignore)
+                : null
         };
-
     }
 
-    private DBColumnMetadata BuildColumn(PropertyInfo property)
+    private DBColumnMetadata BuildColumn(
+        PropertyInfo property,
+        bool tenantScoped)
     {
         var attribute = property.GetCustomAttribute<DBColumnAttribute>(true);
-
         var propertyType = property.PropertyType;
-
         var underlyingType = Nullable.GetUnderlyingType(propertyType)
             ?? propertyType;
-
-        var ignored = property.IsDefined(typeof(IgnoreAttribute), true);
-
+        var isTenantColumn = property.Name == nameof(DBModel.Tenant);
+        var explicitlyIgnored = property.IsDefined(typeof(IgnoreAttribute), true);
+        var ignored = explicitlyIgnored || (isTenantColumn && !tenantScoped);
         var isEnum = underlyingType.IsEnum;
 
         EnumStorage? enumStorage = null;
@@ -134,7 +143,6 @@ public sealed class DBMetadataProvider : IDBMetadataProvider
             enumStorage = attribute is { HasEnumStorage: true }
                 ? attribute.EnumStorage
                 : _options.EnumStorage;
-
         }
 
         int? size = null;
@@ -145,7 +153,6 @@ public sealed class DBMetadataProvider : IDBMetadataProvider
             size = attribute is { HasSize: true }
                 ? attribute.Size
                 : _options.DefaultStringLength;
-
         }
 
         var uniqueAttribute = property
@@ -155,8 +162,6 @@ public sealed class DBMetadataProvider : IDBMetadataProvider
         var defaultOnReturn = property.IsDefined(
             typeof(DefaultOnReturnAttribute),
             true);
-
-        var isTenantCode = property.Name == nameof(DBModel.Tenant);
 
         return new DBColumnMetadata
         {
@@ -184,12 +189,11 @@ public sealed class DBMetadataProvider : IDBMetadataProvider
                 && !ignored
                 && !defaultOnReturn
                 && !property.IsDefined(typeof(NotSearchableAttribute), true)
-                && (!isTenantCode || _options.Search.IncludeTenantCode),
+                && (!isTenantColumn || _options.Search.IncludeTenantCode),
             IsEnum = isEnum,
             EnumStorage = enumStorage,
             IsCode = property.Name == nameof(DBModel.Code),
-            IsTenantCode = isTenantCode
+            IsTenantCode = isTenantColumn
         };
-
     }
 }
