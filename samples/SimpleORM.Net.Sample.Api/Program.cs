@@ -44,10 +44,8 @@ public static class Program
 
         builder.Services.AddSimpleOrmAspNetCore();
 
-        // AddSimpleOrm registers DefaultExtensionService. The sample replaces it
-        // with a database-backed implementation so Customer.Extended is demonstrated
-        // end to end without changing the core public contracts.
-        builder.Services.AddScoped<IExtensionService, SampleExtensionService>();
+        // AddSimpleOrm registers the built-in database-backed extension service.
+        // Customer.Extended therefore works without replacing IExtensionService.
         builder.Services.AddScoped<ICustomerService, CustomerService>();
 
         builder.Services.AddControllers();
@@ -99,6 +97,9 @@ public static class Program
         options.CodeGeneration.Length = 10;
         options.Batch.Save = 100;
         options.Batch.Select = 100;
+        options.Concurrency.Enabled = configuration.GetValue(
+            "SimpleOrm:Concurrency:Enabled",
+            true);
         options.AutoMigration = true;
 
         options.Extensions.RequirePublish = configuration.GetValue(

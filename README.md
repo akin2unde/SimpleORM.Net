@@ -34,6 +34,7 @@ builder.Services.AddSimpleOrm(
         options.CodeGeneration.Length = 10;
         options.Batch.Save = 100;
         options.Batch.Select = 100;
+        options.Concurrency.Enabled = true; // default
         options.AutoMigration = true;
     },
     typeof(Product).Assembly);
@@ -68,6 +69,37 @@ var shortCode = product.GenerateCode(6); // PRD-XXXXXX
 ```
 
 When `Code` is empty during an insert, the repository calls the model's `GenerateCode` using the configured/model metadata length. `Code` is unique by convention.
+
+## Optimistic concurrency
+
+SimpleORM protects updates and deletes from lost updates by default. Every `DBModel` has a `Version` managed by the ORM. The database mutation matches the version originally loaded and increments it atomically when the write succeeds. No separate pre-read is added to the normal write path.
+
+```csharp
+var product = await repository.GetByCode<Product>("PRD-001", ct);
+product!.Price = 120;
+product.DataState = DataState.Changed;
+await repository.Save(product, ct);
+```
+
+If another request changed the same record after it was loaded, `Save` throws `DBConcurrencyException`. For detached/API update models, round-trip the `Version` value returned by the read; omitting or changing it can correctly produce a conflict once the stored record has advanced. With the optional ASP.NET Core error middleware enabled, this exception is returned as HTTP `409 Conflict`.
+
+Concurrency protection is enabled globally by default and can be configured explicitly:
+
+```csharp
+options.Concurrency.Enabled = true;
+```
+
+Models that intentionally use last-write-wins behavior can opt out:
+
+```csharp
+[DisableConcurrencyCheck]
+public sealed class TelemetryLog : DBModel
+{
+    public string Message { get; set; } = string.Empty;
+}
+```
+
+SQL Server keeps bulk performance by checking `Version` in the existing staging-table join. MongoDB includes `Version` in each bulk-write filter. SQL auto-migration seeds existing rows with version `1`; older MongoDB documents without a version are treated as version `1` on their first protected mutation.
 
 ## Repository API
 
@@ -283,6 +315,12 @@ SQL Server auto-migration synchronizes supported table, column, key and index ch
 ## Raw provider queries
 
 `IDBQuery` is available for advanced provider-specific direct queries and supports dynamic or typed result shapes. Prefer `IDataRepository` for normal application CRUD.
+
+## Bulk-write performance
+
+SQL Server batch inserts use `SqlBulkCopy`. Batch updates and deletes stage rows into a temporary table and apply one set-based statement per SimpleORM batch, reducing per-row database round-trips. MongoDB continues to use native bulk writes. For performance comparisons, use the same batch size for both providers; `500` is the maximum SimpleORM physical batch size.
+
+See `docs/PERFORMANCE-AND-CORRECTNESS-2026-09-04.md` for the changes made after the 1,000,000-record Docker benchmark and the next-run guidance.
 
 ## Sample project
 

@@ -33,16 +33,17 @@ public interface IDataRepository
         where T : DBModel;
 
     /// <summary>
-    /// Selects records using a strongly typed expression.
+    /// Selects records using paging parameters without requiring a
+    /// <see cref="SearchParam"/> instance.
     /// </summary>
     /// <typeparam name="T">The DBModel type to select.</typeparam>
     /// <param name="skip">The number of matching records to skip.</param>
     /// <param name="limit">The maximum number of records to return. Zero means all matching records.</param>
     /// <param name="cancellationToken">Token used to cancel the asynchronous operation.</param>
-    /// <param name="batch">Optional batch size.</param>
+    /// <param name="batch">Optional batch size. Physical batches are capped by the ORM maximum.</param>
     /// <returns>A paged result containing the selected models and total matching record count.</returns>
     Task<PagedResult<T>> Select<T>(
-        int skip = 0,
+        int skip,
         int limit = 100,
         CancellationToken cancellationToken = default,
         int? batch = null)

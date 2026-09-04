@@ -46,23 +46,22 @@ public sealed class DataRepository(
     }
 
     /// <inheritdoc />
-    public Task<PagedResult<T>> Select<T>(Expression<Func<T, bool>> expression, int skip = 0, int limit = 100, CancellationToken cancellationToken = default, int? batch = null) where T : DBModel =>
-        Select(expression, null, skip, limit, cancellationToken, batch);
-    /// <inheritdoc />
     public Task<PagedResult<T>> Select<T>(
-        int skip = 0,
+        int skip,
         int limit = 100,
         CancellationToken cancellationToken = default,
         int? batch = null)
-        where T : DBModel
-    {
-        return Select<T>(
-        expression: item => true,
-        skip: skip,
-        limit: limit,
-        cancellationToken: cancellationToken,
-        batch: batch);
-    }
+        where T : DBModel =>
+        Select<T>(
+            search: null,
+            skip: skip,
+            limit: limit,
+            cancellationToken: cancellationToken,
+            batch: batch);
+
+    /// <inheritdoc />
+    public Task<PagedResult<T>> Select<T>(Expression<Func<T, bool>> expression, int skip = 0, int limit = 100, CancellationToken cancellationToken = default, int? batch = null) where T : DBModel =>
+        Select(expression, null, skip, limit, cancellationToken, batch);
     /// <inheritdoc />
     public Task<PagedResult<T>> Select<T>(Expression<Func<T, bool>> expression, SearchParam? search, int skip = 0, int limit = 100, CancellationToken cancellationToken = default, int? batch = null) where T : DBModel =>
         Select<T>(ExpressionTranslator.Translate(expression, search), skip, limit, cancellationToken, batch);
@@ -219,7 +218,18 @@ public sealed class DataRepository(
                 }
             }
         }, cancellationToken);
-        foreach (var item in items) item.DataState = DataState.Unchanged;
+
+        foreach (var item in items)
+        {
+            if (item.DataState == DataState.Changed
+                || (item.DataState == DataState.Removed && !modelMetadata.HardDelete))
+            {
+                item.Version++;
+            }
+
+            item.DataState = DataState.Unchanged;
+        }
+
         ApplyDefaults(items);
         return items;
     }
@@ -256,6 +266,7 @@ public sealed class DataRepository(
             if (item.DataState == DataState.New)
             {
                 if (string.IsNullOrWhiteSpace(item.Code)) item.Code = item.GenerateCode(modelMetadata.CodeLength, options.CodeGeneration.Separator);
+                if (item.Version <= 0) item.Version = 1;
                 if (item.CreatedAt == default) item.CreatedAt = now;
                 item.CreatedBy ??= userProvider.GetUserCode();
             }

@@ -411,19 +411,6 @@ public static class ExtensionUtil
         return Convert.ToBase64String(encryptedData);
     }
     /// <summary>
-    /// Allow AddRange on Ilist
-    /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="list"></param>
-    /// <param name="items"></param>
-    public static void AddRange<T>(this IList<T> list, IEnumerable<T> items)
-    {
-        foreach (var item in items)
-        {
-            list.Add(item);
-        }
-    }
-    /// <summary>
     /// Decrypts Base64-encoded RSA ciphertext with an XML-formatted private key.
     /// </summary>
     /// <param name="encryptedText">The RSA-encrypted value encoded as Base64.</param>

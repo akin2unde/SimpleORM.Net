@@ -22,7 +22,8 @@ public interface ICustomerService
         int? batch = null);
 
     /// <summary>
-    /// Demonstrates IDataRepository.SelectDynamic using fields supplied in a SearchParam.
+    /// Demonstrates IDataRepository.SelectDynamic(SearchParam,...), returning
+    /// only the fields requested in SearchParam.Fields and joined projections.
     /// </summary>
     Task<PagedResult<dynamic>> SelectDynamic(
         SearchParam search,

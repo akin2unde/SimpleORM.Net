@@ -15,6 +15,7 @@ using Microsoft.Extensions.Logging;
 using SimpleORM.Net.Abstractions;
 
 using SimpleORM.Net.Configuration;
+using SimpleORM.Net.Exceptions;
 
 namespace SimpleORM.Net.AspNetCore;
 
@@ -61,13 +62,19 @@ public sealed class SimpleOrmErrorMiddleware(RequestDelegate next)
 
             if(!context.Response.HasStarted)
             {
-                context.Response.StatusCode=500;
+                var concurrencyException = ex as DBConcurrencyException;
+                context.Response.StatusCode = concurrencyException is null
+                    ? StatusCodes.Status500InternalServerError
+                    : StatusCodes.Status409Conflict;
 
                 context.Response.ContentType="application/json";
 
                 await context.Response.WriteAsync(JsonSerializer.Serialize(new
                 {
-                    success=false,message="An unexpected error occurred.",traceCode=context.TraceIdentifier
+                    success=false,
+                    message=concurrencyException?.Message ?? "An unexpected error occurred.",
+                    traceCode=context.TraceIdentifier,
+                    conflicts=concurrencyException?.Codes
                 }
                 ));
 

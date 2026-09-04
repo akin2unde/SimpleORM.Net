@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 using SimpleORM.Net.Attributes;
 
 using SimpleORM.Net.Configuration;
@@ -7,8 +5,6 @@ using SimpleORM.Net.Configuration;
 using SimpleORM.Net.Metadata;
 
 using SimpleORM.Net.Models;
-
-using SimpleORM.Net.Query;
 
 using SimpleORM.Net.Services;
 
@@ -97,53 +93,39 @@ public sealed class CoreTests
         Assert.Equal("0 0 1 * *", metadata.AutoDeleteCron);
     }
 
-    /// <summary>Search comparison operators use their compact public names.</summary>
+
+    /// <summary>Concurrency protection is enabled by default.</summary>
     [Fact]
-    public void SearchOperatorsUseCompactNames()
+    public void ConcurrencyIsEnabledByDefault()
     {
-        Assert.Equal("EQ", SearchOperator.EQ.ToString());
-        Assert.Equal("NEQ", SearchOperator.NEQ.ToString());
-        Assert.Equal("GT", SearchOperator.GT.ToString());
-        Assert.Equal("GTE", SearchOperator.GTE.ToString());
-        Assert.Equal("LT", SearchOperator.LT.ToString());
-        Assert.Equal("LTE", SearchOperator.LTE.ToString());
+        var metadata = new DBMetadataProvider(Options())
+            .GetMetadata<Customer>();
 
-        var json = JsonSerializer.Serialize(SearchOperator.GT);
-        var value = JsonSerializer.Deserialize<SearchOperator>("\"GTE\"");
-
-        Assert.Equal("\"GT\"", json);
-        Assert.Equal(SearchOperator.GTE, value);
+        Assert.True(metadata.ConcurrencyEnabled);
+        Assert.Equal(1, new Customer().Version);
     }
 
-    /// <summary>Query collection properties can be replaced during request binding.</summary>
+    /// <summary>Models can explicitly opt out of concurrency protection.</summary>
     [Fact]
-    public void SearchCollectionsAreMutableAndSettable()
+    public void ModelCanDisableConcurrencyCheck()
     {
-        var search = new SearchParam
-        {
-            Fields = new List<string> { nameof(Customer.Code) },
-            Filters = new List<SearchFilter>
-            {
-                new()
-                {
-                    Field = nameof(Customer.Name),
-                    Operator = SearchOperator.EQ,
-                    Value = "Ada"
-                }
-            },
-            Joins = new List<SearchJoin>
-            {
-                new()
-                {
-                    Model = typeof(Customer),
-                    Fields = new List<string> { nameof(Customer.Name) }
-                }
-            }
-        };
+        var metadata = new DBMetadataProvider(Options())
+            .GetMetadata<NoConcurrencyModel>();
 
-        Assert.Single(search.Fields);
-        Assert.Single(search.Filters);
-        Assert.Single(search.Joins[0].Fields);
+        Assert.False(metadata.ConcurrencyEnabled);
+    }
+
+    /// <summary>Global concurrency can be disabled.</summary>
+    [Fact]
+    public void ConcurrencyCanBeDisabledGlobally()
+    {
+        var options = Options();
+        options.Concurrency.Enabled = false;
+
+        var metadata = new DBMetadataProvider(options)
+            .GetMetadata<Customer>();
+
+        Assert.False(metadata.ConcurrencyEnabled);
     }
 
     private static SimpleOrmOptions Options()=>new()

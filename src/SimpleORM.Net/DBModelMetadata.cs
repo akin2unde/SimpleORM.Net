@@ -29,6 +29,9 @@ public sealed class DBModelMetadata
     /// <summary>Gets whether audit trail is enabled for the model.</summary>
     public bool AuditEnabled { get; init; }
 
+    /// <summary>Gets whether optimistic concurrency checks are enabled for the model.</summary>
+    public bool ConcurrencyEnabled { get; init; }
+
     /// <summary>
     /// Gets whether the model participates in tenant scoping when application
     /// multi-tenancy is enabled.

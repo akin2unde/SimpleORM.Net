@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased - optimistic concurrency
+
+- Added ORM-managed `DBModel.Version` optimistic concurrency token.
+- Added `SimpleOrmOptions.Concurrency.Enabled`, enabled by default.
+- Added `[DisableConcurrencyCheck]` for models that intentionally allow last-write-wins updates.
+- Added `DBConcurrencyException` for stale update/delete detection.
+- SQL Server checks versions inside the existing bulk staging join and increments the version atomically.
+- MongoDB checks versions in bulk mutation filters and increments/replaces the version atomically.
+- SQL auto-migration seeds `Version = 1` when adding the required version column to populated tables.
+- Older MongoDB documents without `Version` are treated as version `1` for their first protected mutation.
+- ASP.NET Core error middleware maps `DBConcurrencyException` to HTTP 409 Conflict.
+
+
+## Unreleased
+
+- Reworked SQL Server batch writes around `SqlBulkCopy` and set-based staging updates/deletes.
+- Fixed no-filter `Select<T>()` translation failure.
+- Enabled built-in automatic `DBModel.Extended` persistence.
+- Added MongoDB operator parity, typed raw-query support, raw execute operations, and Inner/LeftOuter dynamic joins.
+- Restored the paging convenience overload `Select<T>(int skip, int limit = 100, ...)` without reintroducing the constant-true expression path.
+- Added end-to-end `SelectDynamic` coverage to the sample service, controller, and README.
+
+
 ## Sample API correction
 
 - Rebuilt the sample around Controller -> ICustomerService -> IDataRepository.

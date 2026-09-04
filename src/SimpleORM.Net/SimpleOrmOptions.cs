@@ -68,6 +68,14 @@ public sealed class SimpleOrmOptions
     }
     =new();
 
+    /// <summary>Optimistic concurrency settings.</summary>
+    public ConcurrencyOptions Concurrency
+    {
+        get;
+
+    }
+    =new();
+
     /// <summary>Tenant settings.</summary>
     public MultiTenancyOptions MultiTenancy
     {

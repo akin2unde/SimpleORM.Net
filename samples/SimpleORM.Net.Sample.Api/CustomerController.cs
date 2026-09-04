@@ -42,7 +42,10 @@ public sealed class CustomerController : ControllerBase
             batch);
     }
 
-    /// <summary>Returns only the customer fields selected in the request.</summary>
+    /// <summary>
+    /// Returns dynamic customer objects containing only the fields requested
+    /// through SearchParam.Fields and any joined-field projections.
+    /// </summary>
     [HttpPost("SelectDynamic")]
     public Task<PagedResult<dynamic>> SelectDynamic(
         [FromBody] SearchParam search,

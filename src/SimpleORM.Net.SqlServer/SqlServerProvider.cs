@@ -1,3 +1,4 @@
+using System.Data;
 using System.Collections;
 using System.Dynamic;
 using System.Globalization;
@@ -5,6 +6,7 @@ using System.Reflection;
 using Microsoft.Data.SqlClient;
 using SimpleORM.Net.Abstractions;
 using SimpleORM.Net.Configuration;
+using SimpleORM.Net.Exceptions;
 using SimpleORM.Net.Metadata;
 using SimpleORM.Net.Models;
 using SimpleORM.Net.Query;
@@ -249,7 +251,6 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
 
         var sqlTransaction = RequireTransaction(transaction);
         var metadata = _metadata.GetMetadata<T>();
-
         var columns = metadata.PersistedColumns.ToArray();
 
         if (columns.Length == 0)
@@ -258,45 +259,13 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
                 $"Model '{metadata.ModelName}' has no persisted columns.");
         }
 
-        var parameters = new Dictionary<string, object?>();
-        var rows = new List<string>(models.Count);
+        var table = BuildBulkTable(models, columns);
 
-        foreach (var model in models)
-        {
-            var values = new List<string>(columns.Length);
-
-            foreach (var column in columns)
-            {
-                values.Add(
-                    AddParameter(
-                        parameters,
-                        ToDatabaseValue(
-                            column,
-                            column.Property.GetValue(model))));
-            }
-
-            rows.Add(
-                $"({string.Join(", ", values)})");
-        }
-
-        var columnSql = string.Join(
-            ", ",
-            columns.Select(
-                column => $"[{EscapeIdentifier(column.ColumnName)}]"));
-
-        var sql = $"""
-                   INSERT INTO [{EscapeIdentifier(metadata.TableName)}]
-                   (
-                       {columnSql}
-                   )
-                   VALUES
-                   {string.Join("," + Environment.NewLine, rows)};
-                   """;
-
-        await ExecuteInTransaction(
+        await BulkCopy(
             sqlTransaction,
-            sql,
-            parameters,
+            metadata.TableName,
+            table,
+            columns,
             cancellationToken);
     }
 
@@ -317,61 +286,90 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
 
         var sqlTransaction = RequireTransaction(transaction);
         var metadata = _metadata.GetMetadata<T>();
-
+        var versionColumn = GetRequiredColumn(metadata, nameof(DBModel.Version));
         var updateColumns = metadata.PersistedColumns
             .Where(column => !column.IsCode)
             .Where(column => column.PropertyName != nameof(DBModel.CreatedAt))
             .Where(column => column.PropertyName != nameof(DBModel.CreatedBy))
+            .Where(column => column.PropertyName != nameof(DBModel.Version))
             .Where(column => !column.IsTenantCode)
             .ToArray();
 
-        foreach (var model in models)
+        if (updateColumns.Length == 0)
         {
-            var parameters = new Dictionary<string, object?>();
-            var assignments = new List<string>(updateColumns.Length);
+            return;
+        }
 
-            foreach (var column in updateColumns)
-            {
-                var parameter = AddParameter(
-                    parameters,
-                    ToDatabaseValue(
-                        column,
-                        column.Property.GetValue(model)));
+        var stagingColumns = new List<DBColumnMetadata>
+        {
+            metadata.CodeColumn,
+            versionColumn
+        };
 
-                assignments.Add(
-                    $"[{EscapeIdentifier(column.ColumnName)}] = {parameter}");
-            }
+        if (_options.MultiTenancy.Enabled && metadata.TenantScoped)
+        {
+            stagingColumns.Add(
+                metadata.TenantColumn
+                ?? throw new InvalidOperationException(
+                    $"Multi-tenancy is enabled, but model '{metadata.ModelName}' has no tenant column."));
+        }
 
-            if (assignments.Count == 0)
-            {
-                continue;
-            }
+        stagingColumns.AddRange(updateColumns);
+        stagingColumns = stagingColumns
+            .DistinctBy(column => column.ColumnName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
-            var codeParameter = AddParameter(
-                parameters,
-                model.Code);
+        var tempTable = $"#SimpleOrmUpdate_{Guid.NewGuid():N}";
 
-            var whereParts = new List<string>
-            {
-                $"[{EscapeIdentifier(metadata.CodeColumn.ColumnName)}] = {codeParameter}"
-            };
+        await CreateStagingTable(
+            sqlTransaction,
+            metadata.TableName,
+            tempTable,
+            stagingColumns,
+            cancellationToken);
 
-            AddTenantWriteCondition(
-                metadata,
-                parameters,
-                whereParts);
+        var table = BuildBulkTable(models, stagingColumns);
 
-            var sql = $"""
-                       UPDATE [{EscapeIdentifier(metadata.TableName)}]
-                       SET {string.Join(", ", assignments)}
-                       WHERE {string.Join(" AND ", whereParts)};
-                       """;
+        await BulkCopy(
+            sqlTransaction,
+            tempTable,
+            table,
+            stagingColumns,
+            cancellationToken,
+            useTableLock: false);
 
-            await ExecuteInTransaction(
-                sqlTransaction,
-                sql,
-                parameters,
-                cancellationToken);
+        var join = BuildStagingJoin(metadata, metadata.ConcurrencyEnabled);
+        var assignments = updateColumns
+            .Select(column =>
+                $"[t].[{EscapeIdentifier(column.ColumnName)}] = [s].[{EscapeIdentifier(column.ColumnName)}]")
+            .Append(
+                $"[t].[{EscapeIdentifier(versionColumn.ColumnName)}] = [t].[{EscapeIdentifier(versionColumn.ColumnName)}] + 1");
+
+        var activeFilter = metadata.HardDelete
+            ? string.Empty
+            : $" AND [t].[{EscapeIdentifier(GetRequiredColumn(metadata, nameof(DBModel.DeletedAt)).ColumnName)}] IS NULL";
+
+        var sql = $"""
+                  UPDATE [t]
+                  SET {string.Join(", ", assignments)}
+                  FROM [{EscapeIdentifier(metadata.TableName)}] AS [t]
+                  INNER JOIN [{EscapeIdentifier(tempTable)}] AS [s]
+                      ON {join}
+                  WHERE 1 = 1{activeFilter};
+                  SELECT @@ROWCOUNT;
+                  DROP TABLE [{EscapeIdentifier(tempTable)}];
+                  """;
+
+        var affected = await ExecuteScalarInt64InTransaction(
+            sqlTransaction,
+            sql,
+            cancellationToken);
+
+        if (metadata.ConcurrencyEnabled && affected != models.Count)
+        {
+            throw new Exceptions.DBConcurrencyException(
+                typeof(T),
+                models.Select(model => model.Code));
         }
     }
 
@@ -393,75 +391,97 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
 
         var sqlTransaction = RequireTransaction(transaction);
         var metadata = _metadata.GetMetadata<T>();
-
-        foreach (var model in models)
+        var versionColumn = GetRequiredColumn(metadata, nameof(DBModel.Version));
+        var stagingColumns = new List<DBColumnMetadata>
         {
-            var parameters = new Dictionary<string, object?>();
+            metadata.CodeColumn,
+            versionColumn
+        };
 
-            var codeParameter = AddParameter(
-                parameters,
-                model.Code);
+        if (_options.MultiTenancy.Enabled && metadata.TenantScoped)
+        {
+            stagingColumns.Add(
+                metadata.TenantColumn
+                ?? throw new InvalidOperationException(
+                    $"Multi-tenancy is enabled, but model '{metadata.ModelName}' has no tenant column."));
+        }
 
-            var whereParts = new List<string>
-            {
-                $"[{EscapeIdentifier(metadata.CodeColumn.ColumnName)}] = {codeParameter}"
-            };
+        if (!hardDelete)
+        {
+            stagingColumns.Add(GetRequiredColumn(metadata, nameof(DBModel.DeletedAt)));
+            stagingColumns.Add(GetRequiredColumn(metadata, nameof(DBModel.UpdatedAt)));
+            stagingColumns.Add(GetRequiredColumn(metadata, nameof(DBModel.UpdatedBy)));
+        }
 
-            AddTenantWriteCondition(
-                metadata,
-                parameters,
-                whereParts);
+        stagingColumns = stagingColumns
+            .DistinctBy(column => column.ColumnName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
-            string sql;
+        var tempTable = $"#SimpleOrmDelete_{Guid.NewGuid():N}";
 
-            if (hardDelete)
-            {
-                sql = $"""
-                       DELETE FROM [{EscapeIdentifier(metadata.TableName)}]
-                       WHERE {string.Join(" AND ", whereParts)};
-                       """;
-            }
-            else
-            {
-                var deletedAtColumn = GetRequiredColumn(
-                    metadata,
-                    nameof(DBModel.DeletedAt));
+        await CreateStagingTable(
+            sqlTransaction,
+            metadata.TableName,
+            tempTable,
+            stagingColumns,
+            cancellationToken);
 
-                var updatedAtColumn = GetRequiredColumn(
-                    metadata,
-                    nameof(DBModel.UpdatedAt));
+        var table = BuildBulkTable(models, stagingColumns);
 
-                var updatedByColumn = GetRequiredColumn(
-                    metadata,
-                    nameof(DBModel.UpdatedBy));
+        await BulkCopy(
+            sqlTransaction,
+            tempTable,
+            table,
+            stagingColumns,
+            cancellationToken,
+            useTableLock: false);
 
-                var deletedAtParameter = AddParameter(
-                    parameters,
-                    model.DeletedAt ?? DateTime.UtcNow);
+        var join = BuildStagingJoin(metadata, metadata.ConcurrencyEnabled);
+        string sql;
 
-                var updatedAtParameter = AddParameter(
-                    parameters,
-                    model.UpdatedAt ?? DateTime.UtcNow);
+        if (hardDelete)
+        {
+            sql = $"""
+                  DELETE [t]
+                  FROM [{EscapeIdentifier(metadata.TableName)}] AS [t]
+                  INNER JOIN [{EscapeIdentifier(tempTable)}] AS [s]
+                      ON {join};
+                  SELECT @@ROWCOUNT;
+                  DROP TABLE [{EscapeIdentifier(tempTable)}];
+                  """;
+        }
+        else
+        {
+            var deletedAt = GetRequiredColumn(metadata, nameof(DBModel.DeletedAt));
+            var updatedAt = GetRequiredColumn(metadata, nameof(DBModel.UpdatedAt));
+            var updatedBy = GetRequiredColumn(metadata, nameof(DBModel.UpdatedBy));
 
-                var updatedByParameter = AddParameter(
-                    parameters,
-                    model.UpdatedBy);
+            sql = $"""
+                  UPDATE [t]
+                  SET
+                      [t].[{EscapeIdentifier(deletedAt.ColumnName)}] = [s].[{EscapeIdentifier(deletedAt.ColumnName)}],
+                      [t].[{EscapeIdentifier(updatedAt.ColumnName)}] = [s].[{EscapeIdentifier(updatedAt.ColumnName)}],
+                      [t].[{EscapeIdentifier(updatedBy.ColumnName)}] = [s].[{EscapeIdentifier(updatedBy.ColumnName)}],
+                      [t].[{EscapeIdentifier(versionColumn.ColumnName)}] = [t].[{EscapeIdentifier(versionColumn.ColumnName)}] + 1
+                  FROM [{EscapeIdentifier(metadata.TableName)}] AS [t]
+                  INNER JOIN [{EscapeIdentifier(tempTable)}] AS [s]
+                      ON {join}
+                  WHERE [t].[{EscapeIdentifier(deletedAt.ColumnName)}] IS NULL;
+                  SELECT @@ROWCOUNT;
+                  DROP TABLE [{EscapeIdentifier(tempTable)}];
+                  """;
+        }
 
-                sql = $"""
-                       UPDATE [{EscapeIdentifier(metadata.TableName)}]
-                       SET
-                           [{EscapeIdentifier(deletedAtColumn.ColumnName)}] = {deletedAtParameter},
-                           [{EscapeIdentifier(updatedAtColumn.ColumnName)}] = {updatedAtParameter},
-                           [{EscapeIdentifier(updatedByColumn.ColumnName)}] = {updatedByParameter}
-                       WHERE {string.Join(" AND ", whereParts)};
-                       """;
-            }
+        var affected = await ExecuteScalarInt64InTransaction(
+            sqlTransaction,
+            sql,
+            cancellationToken);
 
-            await ExecuteInTransaction(
-                sqlTransaction,
-                sql,
-                parameters,
-                cancellationToken);
+        if (metadata.ConcurrencyEnabled && affected != models.Count)
+        {
+            throw new Exceptions.DBConcurrencyException(
+                typeof(T),
+                models.Select(model => model.Code));
         }
     }
 
@@ -1454,7 +1474,7 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
 
         return column.EnumStorage == EnumStorage.String
             ? enumValue.ToString()
-            : Convert.ToInt64(
+            : Convert.ToInt32(
                 enumValue,
                 CultureInfo.InvariantCulture);
     }
@@ -1524,12 +1544,165 @@ public sealed class SqlServerProvider : IDatabaseProvider, IDBQuery
         return alias;
     }
 
+    private static DataTable BuildBulkTable<T>(
+        IReadOnlyList<T> models,
+        IReadOnlyList<DBColumnMetadata> columns)
+        where T : DBModel
+    {
+        var table = new DataTable();
+
+        foreach (var column in columns)
+        {
+            table.Columns.Add(
+                column.ColumnName,
+                GetBulkClrType(column));
+        }
+
+        foreach (var model in models)
+        {
+            var row = table.NewRow();
+
+            foreach (var column in columns)
+            {
+                row[column.ColumnName] =
+                    ToDatabaseValue(
+                        column,
+                        column.Property.GetValue(model))
+                    ?? DBNull.Value;
+            }
+
+            table.Rows.Add(row);
+        }
+
+        return table;
+    }
+
+    private static Type GetBulkClrType(DBColumnMetadata column)
+    {
+        if (column.IsEnum)
+        {
+            return column.EnumStorage == EnumStorage.String
+                ? typeof(string)
+                : typeof(int);
+        }
+
+        return column.UnderlyingType;
+    }
+
+    private static async Task BulkCopy(
+        SqlTx transaction,
+        string destinationTable,
+        DataTable table,
+        IReadOnlyList<DBColumnMetadata> columns,
+        CancellationToken cancellationToken,
+        bool useTableLock = true)
+    {
+        var options = SqlBulkCopyOptions.CheckConstraints
+                      | SqlBulkCopyOptions.KeepNulls;
+
+        if (useTableLock && table.Rows.Count >= 100)
+        {
+            options |= SqlBulkCopyOptions.TableLock;
+        }
+
+        using var bulkCopy = new SqlBulkCopy(
+            transaction.Connection,
+            options,
+            transaction.Transaction)
+        {
+            DestinationTableName = destinationTable,
+            BatchSize = Math.Max(1, table.Rows.Count),
+            EnableStreaming = true
+        };
+
+        foreach (var column in columns)
+        {
+            bulkCopy.ColumnMappings.Add(
+                column.ColumnName,
+                column.ColumnName);
+        }
+
+        await bulkCopy.WriteToServerAsync(
+            table,
+            cancellationToken);
+    }
+
+    private static async Task CreateStagingTable(
+        SqlTx transaction,
+        string sourceTable,
+        string stagingTable,
+        IReadOnlyList<DBColumnMetadata> columns,
+        CancellationToken cancellationToken)
+    {
+        var projection = string.Join(
+            ", ",
+            columns.Select(column =>
+                $"[{EscapeIdentifier(column.ColumnName)}]"));
+
+        var sql = $"""
+                  SELECT TOP (0) {projection}
+                  INTO [{EscapeIdentifier(stagingTable)}]
+                  FROM [{EscapeIdentifier(sourceTable)}];
+                  """;
+
+        await ExecuteInTransaction(
+            transaction,
+            sql,
+            new Dictionary<string, object?>(),
+            cancellationToken);
+    }
+
+    private string BuildStagingJoin(
+        DBModelMetadata metadata,
+        bool includeConcurrency = false)
+    {
+        var parts = new List<string>
+        {
+            $"[t].[{EscapeIdentifier(metadata.CodeColumn.ColumnName)}] = [s].[{EscapeIdentifier(metadata.CodeColumn.ColumnName)}]"
+        };
+
+        if (_options.MultiTenancy.Enabled && metadata.TenantScoped)
+        {
+            var tenantColumn = metadata.TenantColumn
+                ?? throw new InvalidOperationException(
+                    $"Multi-tenancy is enabled, but model '{metadata.ModelName}' has no tenant column.");
+
+            parts.Add(
+                $"[t].[{EscapeIdentifier(tenantColumn.ColumnName)}] = [s].[{EscapeIdentifier(tenantColumn.ColumnName)}]");
+        }
+
+        if (includeConcurrency)
+        {
+            var versionColumn = GetRequiredColumn(
+                metadata,
+                nameof(DBModel.Version));
+
+            parts.Add(
+                $"[t].[{EscapeIdentifier(versionColumn.ColumnName)}] = [s].[{EscapeIdentifier(versionColumn.ColumnName)}]");
+        }
+
+        return string.Join(" AND ", parts);
+    }
+
     private static SqlTx RequireTransaction(
         IDBTransaction transaction)
     {
         return transaction as SqlTx
             ?? throw new InvalidOperationException(
                 "The supplied transaction was not created by the SQL Server provider.");
+    }
+
+    private static async Task<long> ExecuteScalarInt64InTransaction(
+        SqlTx transaction,
+        string sql,
+        CancellationToken cancellationToken)
+    {
+        await using var command = transaction.Connection.CreateCommand();
+        command.Transaction = transaction.Transaction;
+        command.CommandText = sql;
+
+        var value = await command.ExecuteScalarAsync(cancellationToken);
+        return Convert.ToInt64(value, CultureInfo.InvariantCulture);
     }
 
     private static async Task ExecuteInTransaction(

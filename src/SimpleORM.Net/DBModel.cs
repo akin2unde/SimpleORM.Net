@@ -68,6 +68,19 @@ public abstract class DBModel
 
     }
 
+    /// <summary>
+    /// Optimistic concurrency version. SimpleORM manages this value automatically.
+    /// </summary>
+    [DoNotAudit]
+    public virtual long Version
+    {
+        get;
+
+        set;
+
+    }
+    = 1;
+
     /// <summary>UTC creation time.</summary>
     public virtual DateTime CreatedAt
     {

@@ -108,6 +108,8 @@ public sealed class DBMetadataProvider : IDBMetadataProvider
             HardDelete = type.IsDefined(typeof(HardDeleteAttribute), true),
             Extendable = type.IsDefined(typeof(ExtendableAttribute), true),
             AuditEnabled = !type.IsDefined(typeof(DisableAuditAttribute), true),
+            ConcurrencyEnabled = _options.Concurrency.Enabled
+                && !type.IsDefined(typeof(DisableConcurrencyCheckAttribute), true),
             TenantScoped = tenantScoped,
             AutoDeleteAfterDays = autoDeleteAttribute?.OlderThanDays,
             AutoDeleteCron = autoDeleteAttribute?.Cron,

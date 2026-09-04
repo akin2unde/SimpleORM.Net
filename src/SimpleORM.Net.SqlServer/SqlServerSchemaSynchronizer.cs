@@ -145,22 +145,29 @@ public sealed class SqlServerSchemaSynchronizer : IDBSchemaSynchronizer
                 continue;
             }
 
-            if (!IsNullable(column)
+            var isVersionColumn = column.PropertyName == nameof(DBModel.Version);
+            var tableHasRows = !IsNullable(column)
                 && await TableHasRows(
                     connection,
                     model.TableName,
-                    cancellationToken))
+                    cancellationToken);
+
+            if (tableHasRows && !isVersionColumn)
             {
                 throw new InvalidOperationException(
                     $"Cannot automatically add required column '{model.TableName}.{column.ColumnName}' " +
                     "to a table that already contains data because no default value was defined.");
             }
 
+            var versionDefault = isVersionColumn
+                ? " DEFAULT (1)"
+                : string.Empty;
+
             var sql = $"""
                        ALTER TABLE [{EscapeIdentifier(model.TableName)}]
                        ADD [{EscapeIdentifier(column.ColumnName)}]
                            {GetSqlType(column)}
-                           {(IsNullable(column) ? "NULL" : "NOT NULL")};
+                           {(IsNullable(column) ? "NULL" : "NOT NULL")}{versionDefault};
                        """;
 
             await ExecuteSchemaChange(

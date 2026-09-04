@@ -4,7 +4,7 @@ This project is an end-to-end example of using **SimpleORM.Net** from an ASP.NET
 
 The controller does not know how the ORM works internally. `CustomerController` talks to `ICustomerService`; `CustomerService` uses one injected `IDataRepository` for every model type.
 
-The sample also replaces the core no-op `IExtensionService` with `SampleExtensionService` so dynamic Customer extension values are actually persisted and loaded using the currently selected database provider.
+The core `DefaultExtensionService` persists dynamic Customer extension values automatically using the currently selected database provider.
 
 ## 1. Select a provider
 
@@ -96,6 +96,7 @@ builder.Services.AddSimpleOrm(
         options.CodeGeneration.Length = 10;
         options.Batch.Save = 100;
         options.Batch.Select = 100;
+        options.Concurrency.Enabled = true;
         options.AutoMigration = true;
     },
     typeof(Customer).Assembly,
@@ -114,14 +115,32 @@ or:
 builder.Services.AddSimpleOrmMongoDB();
 ```
 
-The sample then registers its application service and database-backed extension adapter:
+The core registration already includes the database-backed extension service, so the sample only registers its application service:
 
 ```csharp
-builder.Services.AddScoped<IExtensionService, SampleExtensionService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 ```
 
-## 4. Controller → service pattern
+## 4. Optimistic concurrency
+
+Concurrency protection is enabled by default. A loaded `Customer` carries its current `Version`; a successful update or soft delete increments that version. If another request has already changed the record, `Save` throws `DBConcurrencyException` instead of overwriting the newer data.
+
+```csharp
+var customer = await _repository.GetByCode<Customer>(code, cancellationToken);
+customer!.Phone = "08000000000";
+customer.DataState = DataState.Changed;
+await _repository.Save(customer, cancellationToken);
+```
+
+Configure it globally with:
+
+```csharp
+options.Concurrency.Enabled = true;
+```
+
+A model that intentionally permits last-write-wins can use `[DisableConcurrencyCheck]`.
+
+## 5. Controller → service pattern
 
 The controller injects only the application service:
 
@@ -148,26 +167,9 @@ public CustomerService(
 
 The repository is not tied to one model type. Specify the model on each call, for example `Select<Customer>()`, `Save<Inventory>()`, or `GetByCode<DBExtensionDefinition>()`.
 
-To return only selected fields as dynamic objects, post a `SearchParam` to `POST /customer/SelectDynamic`:
-
-```json
-{
-  "fields": ["Code", "Name", "Email"],
-  "filters": [
-    {
-      "field": "Status",
-      "operator": "EQ",
-      "value": "Active"
-    }
-  ]
-}
-```
-
-The response retains the normal paging metadata, but each item in `data` contains only `Code`, `Name`, and `Email`. Comparison operators are `EQ`, `NEQ`, `GT`, `GTE`, `LT`, and `LTE`.
-
 This keeps HTTP concerns out of the data layer and keeps ORM-specific calls out of controllers.
 
-## 5. IDataRepository methods demonstrated by CustomerService
+## 6. IDataRepository methods demonstrated by CustomerService
 
 ### Select with SearchParam
 
@@ -190,6 +192,43 @@ var result = await _repository.Select<Customer>(
 ```
 
 `limit: 0` means return all matching records. Internally the ORM still reads in batches and never sends a physical batch larger than 500.
+
+### SelectDynamic with selected fields
+
+`SelectDynamic` returns `PagedResult<dynamic>` and includes only the fields requested in `SearchParam.Fields` plus any explicitly selected joined fields.
+
+```csharp
+var search = new SearchParam
+{
+    Fields = new List<string>
+    {
+        nameof(Customer.Code),
+        nameof(Customer.FirstName),
+        nameof(Customer.LastName),
+        nameof(Customer.Email)
+    }
+};
+
+var result = await _repository.SelectDynamic<Customer>(
+    search,
+    skip: 0,
+    limit: 100,
+    cancellationToken,
+    batch: 100);
+```
+
+The sample API exposes the same operation through `POST /customer/SelectDynamic`. A minimal request body is:
+
+```json
+{
+  "fields": ["Code", "FirstName", "LastName", "Email"],
+  "filters": [],
+  "joins": [],
+  "orderBy": []
+}
+```
+
+Only the selected fields are materialized into each dynamic result object.
 
 ### Select with expression
 
@@ -394,7 +433,7 @@ The service loads the definition by its ORM `Code`, changes `Published` to `true
 
 ### Load extension values
 
-Normal Customer reads automatically call `IExtensionService.Load`. `SampleExtensionService` loads all active Customer extension definitions and values in batches, then fills:
+Normal Customer reads automatically call `IExtensionService.Load`. `DefaultExtensionService` loads all active Customer extension definitions and values in batches, then fills:
 
 ```csharp
 customer.Extended
@@ -442,7 +481,7 @@ The service:
 3. sets `customer.Extended["CREDIT_LIMIT"].Data`;
 4. changes the Customer to `DataState.Changed`;
 5. calls `IDataRepository.Save`;
-6. `SampleExtensionService.Save` writes the extension value using the same business transaction.
+6. `DefaultExtensionService.Save` writes the extension value using the same business transaction.
 
 Required extension fields are validated before their values are written. String extensions also enforce the definition size when supplied.
 
