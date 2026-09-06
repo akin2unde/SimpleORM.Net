@@ -3,6 +3,9 @@
   <PackageId>SimpleORM.Net.MongoDB</PackageId>
   <Description>MongoDB provider for SimpleORM.Net.</Description>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SimpleORM.Net.Tests" />
+  </ItemGroup>
   <ItemGroup><ProjectReference Include="../SimpleORM.Net/SimpleORM.Net.csproj"/>
   <PackageReference Include="MongoDB.Driver"/></ItemGroup>
 </Project>

@@ -2,6 +2,7 @@
   <PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/SimpleORM.Net/SimpleORM.Net.csproj"/>
+    <ProjectReference Include="../../src/SimpleORM.Net.MongoDB/SimpleORM.Net.MongoDB.csproj"/>
     <PackageReference Include="Microsoft.NET.Test.Sdk"/>
     <PackageReference Include="xunit"/>
     <PackageReference Include="xunit.runner.visualstudio"><PrivateAssets>all</PrivateAssets></PackageReference>

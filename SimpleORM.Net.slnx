@@ -4,6 +4,7 @@
     <Project Path="src/SimpleORM.Net.SqlServer/SimpleORM.Net.SqlServer.csproj" />
     <Project Path="src/SimpleORM.Net.AspNetCore/SimpleORM.Net.AspNetCore.csproj" />
     <Project Path="src/SimpleORM.Net.Http/SimpleORM.Net.Http.csproj" />
+    <Project Path="src/SimpleORM.Net.MongoDB/SimpleORM.Net.MongoDB.csproj" />
   </Folder>
   <Folder Name="/samples/"><Project Path="samples/SimpleORM.Net.Sample.Api/SimpleORM.Net.Sample.Api.csproj" /></Folder>
   <Folder Name="/tests/"><Project Path="tests/SimpleORM.Net.Tests/SimpleORM.Net.Tests.csproj" /></Folder>

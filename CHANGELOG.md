@@ -65,3 +65,13 @@
 - Separated classes, interfaces, and enums into individual source files.
 - Normalized XML documentation placement so declarations are not embedded in documentation comment lines.
 - Kept XML documentation generation and CS1591 enforcement enabled.
+# Unreleased
+
+- Fixed MongoDB persistence so `[Ignore]` properties are excluded before BSON
+  serialization. Ignored nested models are no longer inspected or serialized
+  during insert and replacement update operations.
+- Extended the MongoDB `[Ignore]` convention to nested value objects and list
+  items that do not inherit from `DBModel`, including upload-only properties
+  such as `IFormFile` on a product image model.
+- MongoDB persisted-document creation now respects custom
+  `[DBColumn(Name = "...")]` names without first serializing the complete model.

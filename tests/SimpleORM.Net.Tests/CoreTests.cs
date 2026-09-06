@@ -11,6 +11,8 @@ using SimpleORM.Net.Query;
 using System.Text.Json;
 
 using SimpleORM.Net.Services;
+using SimpleORM.Net.MongoDB;
+using SimpleORM.Net.MongoDB.Configuration;
 
 namespace SimpleORM.Net.Tests;
 
@@ -84,6 +86,51 @@ public sealed class CoreTests
         Assert.DoesNotContain(
             metadata.PersistedColumns,
             column => column.PropertyName == nameof(Customer.TemporaryValue));
+    }
+
+    /// <summary>MongoDB never reads or serializes ignored model properties.</summary>
+    [Fact]
+    public void MongoDocumentExcludesIgnoredModelBeforeSerialization()
+    {
+        MongoDBConventionRegistrar.RegisterPersistence(EnumStorage.String);
+
+        var metadata = new DBMetadataProvider(Options())
+            .GetMetadata<Customer>();
+        var customer = new Customer
+        {
+            Code = "CUS-1",
+            Name = "Ada",
+            RenamedValue = "Visible",
+            Images =
+            [
+                new ProductImageValue
+                {
+                    Url = "/products/item.jpg",
+                    IsPrimary = true,
+                    DisplayOrder = 1
+                }
+            ]
+        };
+
+        var document = MongoDocumentMapper.ToPersistedDocument(
+            customer,
+            metadata);
+
+        Assert.False(document.Contains(nameof(Customer.TemporaryValue)));
+        Assert.False(document.Contains(nameof(Customer.IgnoredModel)));
+        Assert.False(document.Contains(nameof(DBModel.DataState)));
+        Assert.False(document.Contains(nameof(DBModel.Upsert)));
+        Assert.False(document.Contains(nameof(DBModel.Extended)));
+        Assert.Equal("Visible", document["customer_name"].AsString);
+        Assert.False(document.Contains(nameof(Customer.RenamedValue)));
+
+        var image = document[nameof(Customer.Images)]
+            .AsBsonArray[0]
+            .AsBsonDocument;
+
+        Assert.Equal("/products/item.jpg", image[nameof(ProductImageValue.Url)].AsString);
+        Assert.True(image[nameof(ProductImageValue.IsPrimary)].AsBoolean);
+        Assert.False(image.Contains(nameof(ProductImageValue.ImageFile)));
     }
 
     /// <summary>Auto-delete metadata is discovered from the model attribute.</summary>

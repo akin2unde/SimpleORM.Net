@@ -81,10 +81,24 @@ internal static class MongoDBConventionRegistrar
             ConventionRegistry.Register(
                 PersistenceConventionName,
                 conventionPack,
-                type => typeof(DBModel).IsAssignableFrom(type));
+                UsesSimpleOrmPersistenceAttributes);
 
             _persistenceConventionRegistered = true;
         }
+    }
+
+    private static bool UsesSimpleOrmPersistenceAttributes(Type type)
+    {
+        if (typeof(DBModel).IsAssignableFrom(type))
+        {
+            return true;
+        }
+
+        return type
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Any(property => property.IsDefined(
+                typeof(IgnoreAttribute),
+                inherit: true));
     }
 
     private static void RegisterIgnoreExtraElementsConvention()

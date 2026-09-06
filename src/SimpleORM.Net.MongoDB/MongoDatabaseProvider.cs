@@ -850,32 +850,7 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
     DBModelMetadata metadata)
     where T : DBModel
     {
-        var serializedDocument = model.ToBsonDocument();
-
-        var persistedColumnNames = metadata.PersistedColumns
-            .Select(column => column.ColumnName)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var document = new BsonDocument(
-            serializedDocument.Elements.Where(element =>
-                persistedColumnNames.Contains(element.Name)));
-
-        ApplyEnumStorage(model, metadata, document);
-
-        return document;
-    }
-
-    private static void ApplyEnumStorage<T>(
-        T model,
-        DBModelMetadata metadata,
-        BsonDocument document)
-        where T : DBModel
-    {
-        foreach (var column in metadata.PersistedColumns.Where(column => column.IsEnum))
-        {
-            var value = column.Property.GetValue(model);
-            document[column.ColumnName] = ToBsonValue(column, value);
-        }
+        return MongoDocumentMapper.ToPersistedDocument(model, metadata);
     }
     private IMongoCollection<T> Col<T>()
           where T : DBModel
