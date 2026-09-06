@@ -14,7 +14,7 @@
     <Company>Akintunde Morakinyo</Company>
     <Copyright>Copyright © Akintunde Morakinyo</Copyright>
 
-    <Version>0.1.0</Version>
+    <Version>0.1.2</Version>
 
     <RepositoryUrl>https://github.com/akin2unde/SimpleORM.Net</RepositoryUrl>
     <RepositoryType>git</RepositoryType>

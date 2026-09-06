@@ -47,7 +47,11 @@ jobs:
       - name: Publish
         shell: bash
         run: |
-          for package in ./artifacts/*.nupkg; do
+          find ./artifacts \
+            -name "*.nupkg" \
+            ! -name "*.snupkg" \
+            -print0 |
+          while IFS= read -r -d '' package; do
             dotnet nuget push "$package" \
               --api-key "${{ secrets.NUGET_API_KEY }}" \
               --source "https://api.nuget.org/v3/index.json" \
