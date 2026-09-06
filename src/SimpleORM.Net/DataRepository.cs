@@ -16,13 +16,14 @@ public sealed class DataRepository(
     IUserProvider userProvider,
     IExtensionService extensions,
     IAuditService audit,
+    ISearchParamNormalizer searchNormalizer,
     SimpleOrmOptions options) : IDataRepository
 {
     /// <inheritdoc />
     public async Task<PagedResult<T>> Select<T>(SearchParam? search = null, int skip = 0, int limit = 100, CancellationToken cancellationToken = default, int? batch = null) where T : DBModel
     {
         if (skip < 0 || limit < 0) throw new ArgumentOutOfRangeException();
-        var param = search?.Clone() ?? new SearchParam();
+        var param = searchNormalizer.Normalize<T>(search);
         var total = await provider.Count<T>(param, cancellationToken);
         var available = Math.Max(0, total - skip);
         var target = limit == 0 ? available : Math.Min(limit, available);
@@ -83,7 +84,7 @@ public sealed class DataRepository(
                 skip < 0 ? nameof(skip) : nameof(limit));
         }
 
-        var param = search.Clone();
+        var param = searchNormalizer.Normalize<T>(search);
 
         if (param.Fields.Count == 0
             && param.Joins.All(join => join.Fields.Count == 0))
@@ -145,7 +146,7 @@ public sealed class DataRepository(
     /// <inheritdoc />
     public async Task<T?> SelectSingle<T>(SearchParam? search = null, CancellationToken cancellationToken = default) where T : DBModel
     {
-        var item = await provider.SelectSingle<T>(search?.Clone() ?? new SearchParam(), cancellationToken);
+        var item = await provider.SelectSingle<T>(searchNormalizer.Normalize<T>(search), cancellationToken);
         if (item is null) return null;
         await extensions.Load(new[] { item }, cancellationToken);
         ApplyDefaults(new[] { item });
@@ -179,7 +180,7 @@ public sealed class DataRepository(
     }
 
     /// <inheritdoc />
-    public Task<long> Count<T>(SearchParam? search = null, CancellationToken cancellationToken = default) where T : DBModel => provider.Count<T>(search?.Clone() ?? new SearchParam(), cancellationToken);
+    public Task<long> Count<T>(SearchParam? search = null, CancellationToken cancellationToken = default) where T : DBModel => provider.Count<T>(searchNormalizer.Normalize<T>(search), cancellationToken);
     /// <inheritdoc />
     public Task<long> Count<T>(Expression<Func<T, bool>> expression, SearchParam? search = null, CancellationToken cancellationToken = default) where T : DBModel => Count<T>(ExpressionTranslator.Translate(expression, search), cancellationToken);
 
@@ -235,7 +236,7 @@ public sealed class DataRepository(
     }
 
     /// <inheritdoc />
-    public string GenerateDebugQuery<T>(SearchParam? search = null, int skip = 0, int limit = 100) where T : DBModel => provider.GenerateDebugQuery<T>(search?.Clone() ?? new SearchParam(), skip, limit);
+    public string GenerateDebugQuery<T>(SearchParam? search = null, int skip = 0, int limit = 100) where T : DBModel => provider.GenerateDebugQuery<T>(searchNormalizer.Normalize<T>(search), skip, limit);
 
     private void Prepare<T>(IEnumerable<T> items) where T : DBModel
     {

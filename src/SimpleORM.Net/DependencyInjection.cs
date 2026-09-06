@@ -5,6 +5,7 @@ using SimpleORM.Net.Abstractions;
 using SimpleORM.Net.Attributes;
 using SimpleORM.Net.Configuration;
 using SimpleORM.Net.Metadata;
+using SimpleORM.Net.Query;
 using SimpleORM.Net.Services;
 
 namespace SimpleORM.Net;
@@ -57,6 +58,7 @@ public static class DependencyInjection
 
         services.AddSingleton(options);
         services.AddSingleton<IDBMetadataProvider, DBMetadataProvider>();
+        services.AddSingleton<ISearchParamNormalizer, SearchParamNormalizer>();
         services.AddSingleton<ICodeGenerator, CodeGenerator>();
         services.AddScoped<IDBTransactionManager, DBTransactionManager>();
         services.AddScoped<IExtensionService, DefaultExtensionService>();

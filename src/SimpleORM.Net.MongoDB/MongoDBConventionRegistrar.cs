@@ -1,6 +1,8 @@
 using System.Reflection;
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Conventions;
 using SimpleORM.Net.Attributes;
+using SimpleORM.Net.Configuration;
 using SimpleORM.Net.Models;
 using SimpleORM.Net.MongoDB.Options;
 
@@ -29,15 +31,17 @@ internal static class MongoDBConventionRegistrar
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        RegisterPersistenceConvention();
-
         if (options.IgnoreMongoId)
         {
             RegisterIgnoreExtraElementsConvention();
         }
     }
 
-    private static void RegisterPersistenceConvention()
+    /// <summary>
+    /// Registers persistence conventions that depend on the provider-neutral
+    /// SimpleORM configuration.
+    /// </summary>
+    public static void RegisterPersistence(EnumStorage enumStorage)
     {
         lock (RegistrationLock)
         {
@@ -47,6 +51,12 @@ internal static class MongoDBConventionRegistrar
             }
 
             var conventionPack = new ConventionPack();
+
+            conventionPack.Add(
+                new EnumRepresentationConvention(
+                    enumStorage == EnumStorage.String
+                        ? BsonType.String
+                        : BsonType.Int32));
 
             conventionPack.AddPostProcessingConvention(
                 "SimpleOrmIgnoreMembers",

@@ -7,6 +7,14 @@ namespace SimpleORM.Net.Tests;
 internal sealed class Customer : DBModel
 {
 
+    public CustomerStatus Status
+    {
+        get;
+
+        set;
+
+    }
+
     public string Name
     {
         get;
@@ -29,4 +37,10 @@ internal sealed class Customer : DBModel
     [Ignore]
     public string? TemporaryValue { get; set; }
 
+}
+
+internal enum CustomerStatus
+{
+    Inactive,
+    Active
 }

@@ -19,6 +19,8 @@ using SimpleORM.Net.Metadata;
 
 using SimpleORM.Net.Models;
 
+using SimpleORM.Net.MongoDB.Configuration;
+
 using SimpleORM.Net.Query;
 
 namespace SimpleORM.Net.MongoDB;
@@ -40,6 +42,8 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
     /// <summary>Creates provider.</summary>
     public MongoDatabaseProvider(SimpleOrmOptions o, IDBMetadataProvider m, ITenantProvider t)
     {
+        MongoDBConventionRegistrar.RegisterPersistence(o.EnumStorage);
+
         _o = o;
 
         _m = m;
@@ -647,7 +651,7 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
 
         var r = await c.Find(f).ToListAsync(ct);
 
-        return r.Select(x => (dynamic)JsonSerializer.Deserialize<ExpandoObject>(x.ToJson())!).ToArray();
+        return r.Select(ToDynamic).ToArray();
 
     }
 
@@ -760,20 +764,8 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
         where T : DBModel
     {
         var metadata = _m.GetMetadata<T>();
-
-        var persistedNames = metadata.PersistedColumns
-            .Select(column => column.ColumnName)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
         return models
-            .Select(model =>
-            {
-                var serialized = model.ToBsonDocument();
-
-                return new BsonDocument(
-                    serialized.Elements.Where(element =>
-                        persistedNames.Contains(element.Name)));
-            })
+            .Select(model => ToPersistedDocument(model, metadata))
             .ToList();
     }
     private FilterDefinition<BsonDocument> CreateUpdateFilter<T>(
@@ -864,9 +856,26 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
             .Select(column => column.ColumnName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        return new BsonDocument(
+        var document = new BsonDocument(
             serializedDocument.Elements.Where(element =>
                 persistedColumnNames.Contains(element.Name)));
+
+        ApplyEnumStorage(model, metadata, document);
+
+        return document;
+    }
+
+    private static void ApplyEnumStorage<T>(
+        T model,
+        DBModelMetadata metadata,
+        BsonDocument document)
+        where T : DBModel
+    {
+        foreach (var column in metadata.PersistedColumns.Where(column => column.IsEnum))
+        {
+            var value = column.Property.GetValue(model);
+            document[column.ColumnName] = ToBsonValue(column, value);
+        }
     }
     private IMongoCollection<T> Col<T>()
           where T : DBModel
@@ -931,15 +940,16 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
         where T : DBModel
     {
         var field = column.ColumnName;
+        var value = ToDatabaseValue(column, filter.Value);
 
         return filter.Operator switch
         {
-            SearchOperator.EQ => builder.Eq(field, filter.Value),
-            SearchOperator.NEQ => builder.Ne(field, filter.Value),
-            SearchOperator.GT => builder.Gt(field, filter.Value),
-            SearchOperator.GTE => builder.Gte(field, filter.Value),
-            SearchOperator.LT => builder.Lt(field, filter.Value),
-            SearchOperator.LTE => builder.Lte(field, filter.Value),
+            SearchOperator.EQ => builder.Eq(field, value),
+            SearchOperator.NEQ => builder.Ne(field, value),
+            SearchOperator.GT => builder.Gt(field, value),
+            SearchOperator.GTE => builder.Gte(field, value),
+            SearchOperator.LT => builder.Lt(field, value),
+            SearchOperator.LTE => builder.Lte(field, value),
             SearchOperator.Contains => builder.Regex(
                 field,
                 RegexValue(filter.Value, prefix: false, suffix: false)),
@@ -951,10 +961,12 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
                 RegexValue(filter.Value, prefix: false, suffix: true)),
             SearchOperator.In => builder.In(
                 field,
-                GetEnumerableValues(filter.Value, nameof(SearchOperator.In))),
+                GetEnumerableValues(filter.Value, nameof(SearchOperator.In))
+                    .Select(item => ToDatabaseValue(column, item))),
             SearchOperator.NotIn => builder.Nin(
                 field,
-                GetEnumerableValues(filter.Value, nameof(SearchOperator.NotIn))),
+                GetEnumerableValues(filter.Value, nameof(SearchOperator.NotIn))
+                    .Select(item => ToDatabaseValue(column, item))),
             SearchOperator.IsNull => builder.Or(
                 builder.Eq(field, BsonNull.Value),
                 builder.Exists(field, false)),
@@ -964,17 +976,24 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
             SearchOperator.Between => BuildTypedRange(
                 builder,
                 field,
-                filter.Value,
+                ConvertRangeValues(column, filter.Value, SearchOperator.Between),
                 negate: false),
             SearchOperator.NotBetween => BuildTypedRange(
                 builder,
                 field,
-                filter.Value,
+                ConvertRangeValues(column, filter.Value, SearchOperator.NotBetween),
                 negate: true),
             _ => throw new NotSupportedException(
                 $"Search operator '{filter.Operator}' is not supported by MongoDB.")
         };
     }
+
+    private static IEnumerable<object?> ConvertRangeValues(
+        DBColumnMetadata column,
+        object? value,
+        SearchOperator searchOperator) =>
+        GetEnumerableValues(value, searchOperator.ToString())
+            .Select(item => ToDatabaseValue(column, item));
 
     private static FilterDefinition<T> BuildTypedRange<T>(
         FilterDefinitionBuilder<T> builder,
@@ -1102,7 +1121,7 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
     {
         var column = FindPersistedColumn(metadata, filter.Field);
         var field = column.ColumnName;
-        var value = ToBsonValue(filter.Value);
+        var value = ToBsonValue(column, filter.Value);
 
         return filter.Operator switch
         {
@@ -1117,10 +1136,12 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
             SearchOperator.EndsWith => new BsonDocument(field, RegexValue(filter.Value, false, true)),
             SearchOperator.In => new BsonDocument(field, new BsonDocument(
                 "$in",
-                new BsonArray(GetEnumerableValues(filter.Value, "In").Select(ToBsonValue)))),
+                new BsonArray(GetEnumerableValues(filter.Value, "In")
+                    .Select(item => ToBsonValue(column, item))))),
             SearchOperator.NotIn => new BsonDocument(field, new BsonDocument(
                 "$nin",
-                new BsonArray(GetEnumerableValues(filter.Value, "NotIn").Select(ToBsonValue)))),
+                new BsonArray(GetEnumerableValues(filter.Value, "NotIn")
+                    .Select(item => ToBsonValue(column, item))))),
             SearchOperator.IsNull => new BsonDocument(
                 "$or",
                 new BsonArray
@@ -1135,21 +1156,22 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
                     new BsonDocument(field, new BsonDocument("$exists", true)),
                     new BsonDocument(field, new BsonDocument("$ne", BsonNull.Value))
                 }),
-            SearchOperator.Between => BuildDocumentRange(field, filter.Value, false),
-            SearchOperator.NotBetween => BuildDocumentRange(field, filter.Value, true),
+            SearchOperator.Between => BuildDocumentRange(column, field, filter.Value, false),
+            SearchOperator.NotBetween => BuildDocumentRange(column, field, filter.Value, true),
             _ => throw new NotSupportedException(
                 $"Search operator '{filter.Operator}' is not supported by MongoDB.")
         };
     }
 
     private static BsonDocument BuildDocumentRange(
+        DBColumnMetadata column,
         string field,
         object? value,
         bool negate)
     {
         var values = GetEnumerableValues(value, negate ? "NotBetween" : "Between")
             .Take(3)
-            .Select(ToBsonValue)
+            .Select(item => ToBsonValue(column, item))
             .ToArray();
 
         if (values.Length != 2)
@@ -1188,6 +1210,25 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
         }
 
         return BsonValue.Create(value);
+    }
+
+    private static BsonValue ToBsonValue(
+        DBColumnMetadata column,
+        object? value) =>
+        ToBsonValue(ToDatabaseValue(column, value));
+
+    private static object? ToDatabaseValue(
+        DBColumnMetadata column,
+        object? value)
+    {
+        if (value is null || !column.IsEnum || value is not Enum enumValue)
+        {
+            return value;
+        }
+
+        return column.EnumStorage == EnumStorage.String
+            ? enumValue.ToString()
+            : Convert.ToInt32(enumValue, System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private static DBColumnMetadata FindPersistedColumn(
@@ -1287,12 +1328,40 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
 
         foreach (var element in document.Elements)
         {
-            row[element.Name] = element.Value.IsBsonNull
-                ? null
-                : BsonTypeMapper.MapToDotNetValue(element.Value);
+            row[element.Name] = ConvertBsonValue(element.Value);
         }
 
         return (ExpandoObject)row;
+    }
+
+    private static object? ConvertBsonValue(BsonValue value)
+    {
+        return value.BsonType switch
+        {
+            BsonType.Null => null,
+            BsonType.Decimal128 => ConvertDecimal128(value.AsDecimal128),
+            BsonType.Document => ToDynamic(value.AsBsonDocument),
+            BsonType.Array => value.AsBsonArray
+                .Select(ConvertBsonValue)
+                .ToList(),
+            BsonType.ObjectId => value.AsObjectId.ToString(),
+            _ => BsonTypeMapper.MapToDotNetValue(value)
+        };
+    }
+
+    private static object ConvertDecimal128(Decimal128 value)
+    {
+        try
+        {
+            return Decimal128.ToDecimal(value);
+        }
+        catch (OverflowException)
+        {
+            // BSON Decimal128 has a wider range than System.Decimal. Returning
+            // text preserves an otherwise unrepresentable value without
+            // exposing the MongoDB driver type through the provider boundary.
+            return value.ToString();
+        }
     }
 
     private static (string Collection, BsonDocument Filter) ParseRawRequest(string query)
@@ -1327,9 +1396,7 @@ public sealed class MongoDatabaseProvider : IDatabaseProvider, IDBQuery
             .Where(element => propertyNames.Contains(element.Name))
             .ToDictionary(
                 element => element.Name,
-                element => element.Value.IsBsonNull
-                    ? null
-                    : BsonTypeMapper.MapToDotNetValue(element.Value),
+                element => ConvertBsonValue(element.Value),
                 StringComparer.OrdinalIgnoreCase);
 
         var json = JsonSerializer.Serialize(values);

@@ -6,6 +6,10 @@ using SimpleORM.Net.Metadata;
 
 using SimpleORM.Net.Models;
 
+using SimpleORM.Net.Query;
+
+using System.Text.Json;
+
 using SimpleORM.Net.Services;
 
 namespace SimpleORM.Net.Tests;
@@ -126,6 +130,60 @@ public sealed class CoreTests
             .GetMetadata<Customer>();
 
         Assert.False(metadata.ConcurrencyEnabled);
+    }
+
+    /// <summary>Numeric JSON filter values are converted to model enum values.</summary>
+    [Fact]
+    public void SearchFilterConvertsNumericJsonElementToEnum()
+    {
+        var metadata = new DBMetadataProvider(Options());
+        var normalizer = new SearchParamNormalizer(metadata);
+        using var document = JsonDocument.Parse("1");
+        var search = new SearchParam
+        {
+            Filters =
+            [
+                new SearchFilter
+                {
+                    Field = nameof(Customer.Status),
+                    Operator = SearchOperator.EQ,
+                    Value = document.RootElement.Clone()
+                }
+            ]
+        };
+
+        var normalized = normalizer.Normalize<Customer>(search);
+
+        Assert.Equal(CustomerStatus.Active, normalized.Filters[0].Value);
+        Assert.IsType<JsonElement>(search.Filters[0].Value);
+    }
+
+    /// <summary>JSON arrays used by IN are converted item by item.</summary>
+    [Fact]
+    public void SearchFilterConvertsJsonArrayToEnumValues()
+    {
+        var metadata = new DBMetadataProvider(Options());
+        var normalizer = new SearchParamNormalizer(metadata);
+        using var document = JsonDocument.Parse("[0, 1]");
+        var search = new SearchParam
+        {
+            Filters =
+            [
+                new SearchFilter
+                {
+                    Field = nameof(Customer.Status),
+                    Operator = SearchOperator.In,
+                    Value = document.RootElement.Clone()
+                }
+            ]
+        };
+
+        var normalized = normalizer.Normalize<Customer>(search);
+        var values = Assert.IsType<List<object?>>(normalized.Filters[0].Value);
+
+        Assert.Equal(
+            new[] { CustomerStatus.Inactive, CustomerStatus.Active },
+            values.Cast<CustomerStatus>().ToArray());
     }
 
     private static SimpleOrmOptions Options()=>new()

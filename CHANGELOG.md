@@ -15,6 +15,9 @@
 
 ## Unreleased
 
+- Added provider-neutral `SearchParam` value normalization so JSON values, including numeric or named enums and multi-value operators, are converted to model CLR types before reaching any database provider.
+- Fixed MongoDB dynamic projections and raw dynamic queries returning `Decimal128` values as `{}` by converting representable values to CLR `decimal` before serialization.
+- Applied model-level and property-level `EnumStorage` metadata to MongoDB inserts, replacements, and search filters instead of relying on the driver's default numeric enum serialization.
 - Reworked SQL Server batch writes around `SqlBulkCopy` and set-based staging updates/deletes.
 - Fixed no-filter `Select<T>()` translation failure.
 - Enabled built-in automatic `DBModel.Extended` persistence.
